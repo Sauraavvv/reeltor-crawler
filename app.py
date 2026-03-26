@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import json
 import os
@@ -150,6 +149,33 @@ st.markdown("""
     #MainMenu { visibility: hidden; }
     footer    { visibility: hidden; }
     header    { visibility: hidden; }
+
+    /* Always-visible sidebar toggle at top-left */
+    [data-testid="collapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        position: fixed !important;
+        top: 12px !important;
+        left: 12px !important;
+        z-index: 999999 !important;
+        background: #1f6feb !important;
+        border-radius: 6px !important;
+        width: 36px !important;
+        height: 36px !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+    }
+    [data-testid="collapsedControl"]:hover {
+        background: #388bfd !important;
+    }
+    [data-testid="collapsedControl"] svg {
+        fill: #ffffff !important;
+        width: 18px !important;
+        height: 18px !important;
+    }
 
     div[data-testid="stDownloadButton"] button {
         background: #1f6feb !important;
@@ -546,7 +572,7 @@ if analyze_btn and url_count > 0:
         unsafe_allow_html=True,
     )
 
-    with st.spinner("Spider running…"):
+    with st.spinner("I'm working, sit back and have some popcorns :)"):
         success, log_text = run_spider(tmp_urls.name, output_path)
 
     st.session_state.last_run_log = log_text
@@ -576,18 +602,7 @@ if analyze_btn and url_count > 0:
 
 
 # ─── main area ────────────────────────────────────────────────────────────────
-c_title, c_toggle = st.columns([10, 1])
-c_title.markdown("# SEO Site Audit")
-with c_toggle:
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("☰", help="Toggle sidebar"):
-        st.session_state["_sidebar_open"] = not st.session_state.get("_sidebar_open", True)
-        js = """<script>
-            const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-            const btn     = window.parent.document.querySelector('[data-testid="collapsedControl"]');
-            if (btn) btn.click();
-        </script>"""
-        components.html(js, height=0)
+st.markdown("# SEO Site Audit")
 
 data = st.session_state.data
 
@@ -966,7 +981,18 @@ with tab2:
             html += row("X-Vercel-Cache",     _cache_hit_badge(page.get("x_vercel_cache", "")))
             html += row("CF-Cache-Status",    _cache_hit_badge(page.get("cf_cache_status", "")))
             html += row("CDN-Cache-Control",  plain(page.get("cdn_cache_control", "")))
-            html += row("Surrogate-Key",      plain(page.get("surrogate_key", "")))
+            sk_raw = page.get("surrogate_key", "")
+            if sk_raw:
+                sk_items = sk_raw.split()
+                sk_html = "".join(
+                    f'<div style="padding:3px 0;font-size:12px;color:#8b949e">'
+                    f'<span style="color:#58a6ff;margin-right:6px">v{i}.</span>{tag}</div>'
+                    for i, tag in enumerate(sk_items, 1)
+                )
+                sk_val = f'<div style="text-align:left">{sk_html}</div>'
+            else:
+                sk_val = badge("—", "gray")
+            html += row("Surrogate-Key", sk_val)
             html += row("Pragma",             plain(page.get("pragma", "")))
             st.markdown(html, unsafe_allow_html=True)
 
