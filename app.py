@@ -148,46 +148,7 @@ st.markdown("""
 
     #MainMenu { visibility: hidden; }
     footer    { visibility: hidden; }
-
-    /* Hide only the Streamlit toolbar/branding inside the header,
-       NOT the header itself (it may contain the sidebar toggle) */
-    [data-testid="stToolbar"]    { visibility: hidden !important; }
-    [data-testid="stDecoration"] { display: none !important; }
-    [data-testid="stHeader"] {
-        background: transparent !important;
-        border-bottom: none !important;
-    }
-
-    /* Sidebar toggle — covers old (collapsedControl) and new
-       (stSidebarCollapsedControl) Streamlit versions */
-    [data-testid="collapsedControl"],
-    [data-testid="stSidebarCollapsedControl"] {
-        display: flex !important;
-        visibility: visible !important;
-        opacity: 1 !important;
-        position: fixed !important;
-        top: 12px !important;
-        left: 12px !important;
-        z-index: 999999 !important;
-        background: #1f6feb !important;
-        border-radius: 6px !important;
-        width: 36px !important;
-        height: 36px !important;
-        align-items: center !important;
-        justify-content: center !important;
-        cursor: pointer !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
-    }
-    [data-testid="collapsedControl"]:hover,
-    [data-testid="stSidebarCollapsedControl"]:hover {
-        background: #388bfd !important;
-    }
-    [data-testid="collapsedControl"] svg,
-    [data-testid="stSidebarCollapsedControl"] svg {
-        fill: #ffffff !important;
-        width: 18px !important;
-        height: 18px !important;
-    }
+    header    { visibility: hidden; }
 
     div[data-testid="stDownloadButton"] button {
         background: #1f6feb !important;
@@ -201,48 +162,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Inject JS (via same-origin iframe) to keep sidebar toggle always blue & visible
-import streamlit.components.v1 as _components
-_components.html("""
-<script>
-(function() {
-    var SELECTORS = [
-        '[data-testid="collapsedControl"]',
-        '[data-testid="stSidebarCollapsedControl"]'
-    ];
-    function styleBtn() {
-        SELECTORS.forEach(function(sel) {
-            var el = window.parent.document.querySelector(sel);
-            if (el) {
-                el.style.cssText = [
-                    'display:flex!important',
-                    'visibility:visible!important',
-                    'opacity:1!important',
-                    'position:fixed!important',
-                    'top:12px!important',
-                    'left:12px!important',
-                    'z-index:999999!important',
-                    'background:#1f6feb!important',
-                    'border-radius:6px!important',
-                    'width:36px!important',
-                    'height:36px!important',
-                    'align-items:center!important',
-                    'justify-content:center!important',
-                    'cursor:pointer!important',
-                    'box-shadow:0 2px 8px rgba(0,0,0,0.5)!important'
-                ].join(';');
-                var svg = el.querySelector('svg');
-                if (svg) { svg.style.cssText = 'fill:#fff!important;width:18px!important;height:18px!important'; }
-            }
-        });
-    }
-    styleBtn();
-    var obs = new MutationObserver(styleBtn);
-    obs.observe(window.parent.document.body, { childList: true, subtree: true });
-})();
-</script>
-""", height=1)
 
 # ─── session state ────────────────────────────────────────────────────────────
 for key, default in [
