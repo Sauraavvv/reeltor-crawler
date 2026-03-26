@@ -148,13 +148,27 @@ st.markdown("""
 
     #MainMenu { visibility: hidden; }
     footer    { visibility: hidden; }
+    header    { visibility: hidden; }
 
-    /* Hide only the toolbar/decoration inside header, NOT the whole header.
-       The sidebar re-open button lives inside the header — hiding the full
-       header hides it too, leaving no way to reopen the sidebar. */
-    header { background: transparent !important; }
-    [data-testid="stDecoration"] { display: none !important; }
-    [data-testid="stToolbar"]    { visibility: hidden !important; }
+    /* Sidebar hidden state — toggled via session state */
+    .sidebar-hidden [data-testid="stSidebar"] { display: none !important; }
+
+    /* Toggle button — always visible, top-left, blue pill */
+    div[data-testid="stHorizontalBlock"]:first-of-type
+        div[data-testid="stButton"]:first-child button {
+        background: #1f6feb !important;
+        color: #fff !important;
+        border: none !important;
+        border-radius: 6px !important;
+        font-size: 18px !important;
+        padding: 4px 12px !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+    }
+    div[data-testid="stHorizontalBlock"]:first-of-type
+        div[data-testid="stButton"]:first-child button:hover {
+        background: #388bfd !important;
+    }
 
     div[data-testid="stDownloadButton"] button {
         background: #1f6feb !important;
@@ -321,9 +335,17 @@ for key, default in [
     ("sitemap_index", []),
     ("sitemap_urls", []),
     ("input_mode", "Sitemap"),
+    ("sidebar_visible", True),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
+
+# Apply sidebar hide class to the app root when collapsed
+if not st.session_state.sidebar_visible:
+    st.markdown(
+        '<style>[data-testid="stSidebar"]{display:none!important}</style>',
+        unsafe_allow_html=True,
+    )
 
 # ─── sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -580,7 +602,14 @@ if analyze_btn and url_count > 0:
 
 
 # ─── main area ────────────────────────────────────────────────────────────────
-st.markdown("# SEO Site Audit")
+_tb_col, _title_col = st.columns([1, 11])
+with _tb_col:
+    _icon = "✕" if st.session_state.sidebar_visible else "☰"
+    _tip  = "Hide sidebar" if st.session_state.sidebar_visible else "Show sidebar"
+    if st.button(_icon, help=_tip, key="sidebar_toggle"):
+        st.session_state.sidebar_visible = not st.session_state.sidebar_visible
+        st.rerun()
+_title_col.markdown("# SEO Site Audit")
 
 data = st.session_state.data
 
