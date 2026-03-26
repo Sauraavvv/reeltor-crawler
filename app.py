@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import json
 import os
@@ -268,15 +269,6 @@ def fetch_urls_from_sitemap(sitemap_url: str) -> tuple[list[str], str]:
         return [], str(exc)
 
 
-def _sitemap_label(url: str) -> str:
-    """Human-readable label for a sitemap URL."""
-    import re
-    # e.g. /sitemap/3.xml → "sitemap/3"  |  /sitemap-news.xml → "news"
-    name = url.rstrip("/").split("/")[-1].replace(".xml", "")
-    # strip generic prefix
-    name = re.sub(r"^sitemap[-_]?", "", name)
-    return name or url
-
 
 def run_spider(urls_file: str, output_file: str) -> tuple[bool, str]:
     """Run the scrapy spider and return (success, log_text)."""
@@ -414,26 +406,11 @@ with st.sidebar:
                     elif enabled:
                         cat_ranges[cat] = (min_n, max_n)
 
-            # ── Standalone sitemaps (no number) ─────────────────────────
-            standalone = grouped.get("__standalone__", [])
-            sel_standalone: list[str] = []
-            if standalone:
-                st.markdown("**Standalone sitemaps**")
-                sa_labels = {_sitemap_label(u): u for _, u in standalone}
-                sel_standalone_labels = st.multiselect(
-                    "Standalone",
-                    options=list(sa_labels.keys()),
-                    default=[],
-                    label_visibility="collapsed",
-                )
-                sel_standalone = [sa_labels[l] for l in sel_standalone_labels]
-
             fetch_btn = st.button("Fetch Selected Sitemaps", use_container_width=True)
             if fetch_btn:
                 selected_urls: list[str] = []
                 errors_list: list[str] = []
 
-                # Fetch enabled categories within chosen range
                 for cat, (lo, hi) in cat_ranges.items():
                     for num, su in grouped[cat]:
                         if lo <= num <= hi:
@@ -441,13 +418,6 @@ with st.sidebar:
                             selected_urls.extend(u)
                             if e:
                                 errors_list.append(e)
-
-                # Fetch standalone
-                for su in sel_standalone:
-                    u, e = fetch_urls_from_sitemap(su)
-                    selected_urls.extend(u)
-                    if e:
-                        errors_list.append(e)
 
                 if errors_list:
                     st.warning("\n".join(errors_list))
@@ -552,14 +522,6 @@ with st.sidebar:
             index=0,
         )
 
-        st.markdown("---")
-        st.markdown("**Quick Stats**")
-        total     = len(data)
-        indexable = sum(1 for d in data if d.get("is_indexable"))
-        errors    = sum(1 for d in data if str(d.get("status_code", ""))[:1] in ("4", "5"))
-        st.metric("Total URLs", total)
-        st.metric("Indexable",  indexable)
-        st.metric("4xx/5xx",    errors)
     else:
         sel_status = []
         sel_index  = "All"
@@ -614,7 +576,18 @@ if analyze_btn and url_count > 0:
 
 
 # ─── main area ────────────────────────────────────────────────────────────────
-st.markdown("# SEO Site Audit")
+c_title, c_toggle = st.columns([10, 1])
+c_title.markdown("# SEO Site Audit")
+with c_toggle:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("☰", help="Toggle sidebar"):
+        st.session_state["_sidebar_open"] = not st.session_state.get("_sidebar_open", True)
+        js = """<script>
+            const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+            const btn     = window.parent.document.querySelector('[data-testid="collapsedControl"]');
+            if (btn) btn.click();
+        </script>"""
+        components.html(js, height=0)
 
 data = st.session_state.data
 
@@ -658,27 +631,21 @@ idx           = sum(1 for d in filtered if d.get("is_indexable"))
 missing_title = sum(1 for d in filtered if not d.get("title"))
 missing_desc  = sum(1 for d in filtered if not d.get("meta_description"))
 missing_h1    = sum(1 for d in filtered if not d.get("has_h1"))
-no_schema     = sum(1 for d in filtered if d.get("schema_json_ld") != "YES")
+cache_hits    = sum(
+    1 for d in filtered
+    if str(d.get("x_vercel_cache", "")).upper() == "HIT"
+    or str(d.get("cf_cache_status", "")).upper() == "HIT"
+)
 
-mcard(c1, "Total URLs",       total_f,       "")
-mcard(c2, "2xx OK",           ok_2xx,        "green")
-mcard(c3, "Indexable",        idx,           "green")
-mcard(c4, "Missing Title",    missing_title, "red" if missing_title else "green")
-mcard(c5, "Missing Meta",     missing_desc,  "red" if missing_desc  else "green")
-mcard(c6, "Missing H1",       missing_h1,    "red" if missing_h1    else "green")
-mcard(c7, "No Schema",        no_schema,     "red" if no_schema     else "green")
+mcard(c1, "Total URLs",    total_f,       "")
+mcard(c2, "2xx OK",        ok_2xx,        "green")
+mcard(c3, "Indexable",     idx,           "green")
+mcard(c4, "Missing Title", missing_title, "red" if missing_title else "green")
+mcard(c5, "Missing Meta",  missing_desc,  "red" if missing_desc  else "green")
+mcard(c6, "Missing H1",    missing_h1,    "red" if missing_h1    else "green")
+mcard(c7, "Cache HITs",    cache_hits,    "green" if cache_hits else "yellow")
 
 st.markdown("<br>", unsafe_allow_html=True)
-
-# ─── download JSON ────────────────────────────────────────────────────────────
-if st.session_state.output_json_bytes:
-    st.download_button(
-        label="Download JSON Report",
-        data=st.session_state.output_json_bytes,
-        file_name="seo_report.json",
-        mime="application/json",
-    )
-
 st.markdown("---")
 
 # ─── tabs ─────────────────────────────────────────────────────────────────────
