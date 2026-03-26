@@ -361,66 +361,93 @@ with st.sidebar:
         sitemap_index = st.session_state.get("sitemap_index", [])
 
         if sitemap_index:
-            # Split into numbered vs named
             import re
-            numbered = sorted(
-                [u for u in sitemap_index if re.search(r"/sitemap/\d+\.xml$", u)],
-                key=lambda u: int(re.search(r"/(\d+)\.xml$", u).group(1))
-            )
-            named = [u for u in sitemap_index if u not in numbered]
+            from collections import defaultdict
 
-            # Named sitemaps — multiselect
-            named_labels = {_sitemap_label(u): u for u in named}
-            if named_labels:
-                st.markdown("**Named sitemaps**")
-                sel_named_labels = st.multiselect(
-                    "Named sitemaps",
-                    options=list(named_labels.keys()),
+            # Group sitemaps by category:
+            #   /sitemap/N.xml            → category "main"
+            #   /sitemap/CATEGORY/N.xml   → category CATEGORY  (vastu, news, blogs, 15k …)
+            #   anything else             → category "__standalone__"
+            grouped: dict[str, list[tuple]] = defaultdict(list)
+            for u in sitemap_index:
+                m_cat = re.search(r"/sitemap/([^/]+)/(\d+)\.xml", u)
+                m_num = re.search(r"/sitemap/(\d+)\.xml", u)
+                if m_cat:
+                    grouped[m_cat.group(1)].append((int(m_cat.group(2)), u))
+                elif m_num:
+                    grouped["main"].append((int(m_num.group(1)), u))
+                else:
+                    grouped["__standalone__"].append((None, u))
+
+            # Sort entries within each group by number
+            for cat in grouped:
+                grouped[cat].sort(key=lambda x: (x[0] is None, x[0]))
+
+            # ── Per-category range sliders ──────────────────────────────
+            cat_ranges: dict[str, tuple[int, int]] = {}
+            cat_enabled: dict[str, bool] = {}
+
+            numbered_cats = [c for c in grouped if c != "__standalone__"]
+            if numbered_cats:
+                st.markdown("**Select sitemap categories & range**")
+                for cat in sorted(numbered_cats):
+                    nums   = [n for n, _ in grouped[cat]]
+                    min_n, max_n = min(nums), max(nums)
+                    label  = "Main pages" if cat == "main" else cat.capitalize()
+                    enabled = st.checkbox(
+                        f"{label}  ({min_n}–{max_n})",
+                        value=False,
+                        key=f"cb_{cat}",
+                    )
+                    cat_enabled[cat] = enabled
+                    if enabled and min_n < max_n:
+                        rng = st.slider(
+                            f"Range — {label}",
+                            min_value=min_n,
+                            max_value=max_n,
+                            value=(min_n, max_n),
+                            step=1,
+                            label_visibility="collapsed",
+                            key=f"rng_{cat}",
+                        )
+                        cat_ranges[cat] = rng
+                    elif enabled:
+                        cat_ranges[cat] = (min_n, max_n)
+
+            # ── Standalone sitemaps (no number) ─────────────────────────
+            standalone = grouped.get("__standalone__", [])
+            sel_standalone: list[str] = []
+            if standalone:
+                st.markdown("**Standalone sitemaps**")
+                sa_labels = {_sitemap_label(u): u for _, u in standalone}
+                sel_standalone_labels = st.multiselect(
+                    "Standalone",
+                    options=list(sa_labels.keys()),
                     default=[],
                     label_visibility="collapsed",
                 )
-            else:
-                sel_named_labels = []
-
-            # Numbered sitemaps — range
-            if numbered:
-                nums = [int(re.search(r"/(\d+)\.xml$", u).group(1)) for u in numbered]
-                min_n, max_n = min(nums), max(nums)
-                st.markdown(f"**Numbered sitemaps** ({min_n}–{max_n} available)")
-                num_range = st.slider(
-                    "Select range",
-                    min_value=min_n,
-                    max_value=max_n,
-                    value=(min_n, min(min_n, max_n)),
-                    step=1,
-                    label_visibility="collapsed",
-                )
-            else:
-                num_range = (0, 0)
+                sel_standalone = [sa_labels[l] for l in sel_standalone_labels]
 
             fetch_btn = st.button("Fetch Selected Sitemaps", use_container_width=True)
             if fetch_btn:
                 selected_urls: list[str] = []
                 errors_list: list[str] = []
 
-                # Fetch named
-                for lbl in sel_named_labels:
-                    u, e = fetch_urls_from_sitemap(named_labels[lbl])
+                # Fetch enabled categories within chosen range
+                for cat, (lo, hi) in cat_ranges.items():
+                    for num, su in grouped[cat]:
+                        if lo <= num <= hi:
+                            u, e = fetch_urls_from_sitemap(su)
+                            selected_urls.extend(u)
+                            if e:
+                                errors_list.append(e)
+
+                # Fetch standalone
+                for su in sel_standalone:
+                    u, e = fetch_urls_from_sitemap(su)
                     selected_urls.extend(u)
                     if e:
                         errors_list.append(e)
-
-                # Fetch numbered range
-                if numbered and num_range[1] >= num_range[0]:
-                    range_urls = [
-                        u for u in numbered
-                        if num_range[0] <= int(re.search(r"/(\d+)\.xml$", u).group(1)) <= num_range[1]
-                    ]
-                    for su in range_urls:
-                        u, e = fetch_urls_from_sitemap(su)
-                        selected_urls.extend(u)
-                        if e:
-                            errors_list.append(e)
 
                 if errors_list:
                     st.warning("\n".join(errors_list))
