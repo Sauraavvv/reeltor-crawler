@@ -221,8 +221,10 @@ class ReeltorSeoSpider(scrapy.Spider):
             if img.attrib.get('width') and img.attrib.get('height')
         ])
         item['webp_images'] = len(response.css('img[src*=".webp"], source[type="image/webp"]'))
+        from urllib.parse import urljoin
         item['image_urls'] = list(dict.fromkeys(
-            src for img in images
+            urljoin(response.url, src)
+            for img in images
             for src in [img.attrib.get('src', '').strip()]
             if src
         ))
@@ -233,13 +235,17 @@ class ReeltorSeoSpider(scrapy.Spider):
         internal = [l for l in all_links if base_domain in l or l.startswith('/')]
         external = [l for l in all_links if l.startswith(('http', '//')) and base_domain not in l]
         other = [l for l in all_links if l not in internal and l not in external]
-        item['total_links'] = len(all_links)
-        item['internal_links'] = len(internal)
-        item['external_links'] = len(external)
+        # deduplicate lists — counts are derived from these so they always match the tabs
+        internal_list = list(dict.fromkeys(internal))
+        external_list = list(dict.fromkeys(external))
+        other_list    = list(dict.fromkeys(other))
+        item['internal_links_list'] = internal_list
+        item['external_links_list'] = external_list
+        item['other_links_list']    = other_list
+        item['internal_links'] = len(internal_list)
+        item['external_links'] = len(external_list)
+        item['total_links']    = len(internal_list) + len(external_list) + len(other_list)
         item['nofollow_links'] = len(response.css('a[rel*="nofollow"]'))
-        item['internal_links_list'] = list(dict.fromkeys(internal))
-        item['external_links_list'] = list(dict.fromkeys(external))
-        item['other_links_list'] = list(dict.fromkeys(other))
 
         item['og_title'] = response.css('meta[property="og:title"]::attr(content)').get(default='')
         item['og_description'] = response.css('meta[property="og:description"]::attr(content)').get(default='')

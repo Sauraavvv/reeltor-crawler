@@ -724,7 +724,7 @@ with tab2:
             html += row("Total Links",    plain(page.get("total_links", 0)))
             html += row("Internal Links", badge(page.get("internal_links", 0), "green"))
             html += row("External Links", plain(page.get("external_links", 0)))
-            html += row("Other Links",    plain(page.get("total_links", 0) - page.get("internal_links", 0) - page.get("external_links", 0)))
+            html += row("Other Links",    plain(len(page.get("other_links_list", []))))
             html += row("Nofollow Links", plain(page.get("nofollow_links", 0)))
             html += row("Rel Next",       plain(page.get("rel_next", "")))
             html += row("Rel Prev",       plain(page.get("rel_prev", "")))
