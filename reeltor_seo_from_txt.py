@@ -33,6 +33,9 @@ class ReeltorSeoItem(scrapy.Item):
     total_images = scrapy.Field()
     images_without_alt = scrapy.Field()
     image_urls = scrapy.Field()
+    lazy_image_urls = scrapy.Field()
+    webp_image_urls = scrapy.Field()
+    wh_image_urls = scrapy.Field()
 
     total_links = scrapy.Field()
     internal_links = scrapy.Field()
@@ -79,6 +82,12 @@ class ReeltorSeoItem(scrapy.Item):
     x_robots_tag = scrapy.Field()
     cache_control = scrapy.Field()
     server = scrapy.Field()
+    x_vercel_cache = scrapy.Field()
+    cdn_cache_control = scrapy.Field()
+    surrogate_key = scrapy.Field()
+    age_seconds = scrapy.Field()
+    cf_cache_status = scrapy.Field()
+    pragma = scrapy.Field()
 
     rel_next = scrapy.Field()
     rel_prev = scrapy.Field()
@@ -228,6 +237,22 @@ class ReeltorSeoSpider(scrapy.Spider):
             for src in [img.attrib.get('src', '').strip()]
             if src
         ))
+        item['lazy_image_urls'] = list(dict.fromkeys(
+            urljoin(response.url, img.attrib.get('src', '').strip())
+            for img in images
+            if img.attrib.get('loading', '').lower() == 'lazy' and img.attrib.get('src', '').strip()
+        ))
+        item['webp_image_urls'] = list(dict.fromkeys(
+            urljoin(response.url, src)
+            for img in response.css('img[src*=".webp"], source[type="image/webp"]')
+            for src in [img.attrib.get('src', img.attrib.get('srcset', '')).strip()]
+            if src
+        ))
+        item['wh_image_urls'] = list(dict.fromkeys(
+            urljoin(response.url, img.attrib.get('src', '').strip())
+            for img in images
+            if img.attrib.get('width') and img.attrib.get('height') and img.attrib.get('src', '').strip()
+        ))
 
         all_links = response.css('a::attr(href)').getall()
         parsed = urlparse(response.url)
@@ -290,6 +315,12 @@ class ReeltorSeoSpider(scrapy.Spider):
         item['x_robots_tag'] = response.headers.get('X-Robots-Tag', b'').decode('utf-8', errors='ignore')
         item['cache_control'] = response.headers.get('Cache-Control', b'').decode('utf-8', errors='ignore')
         item['server'] = response.headers.get('Server', b'').decode('utf-8', errors='ignore')
+        item['x_vercel_cache'] = response.headers.get('X-Vercel-Cache', b'').decode('utf-8', errors='ignore')
+        item['cdn_cache_control'] = response.headers.get('CDN-Cache-Control', b'').decode('utf-8', errors='ignore')
+        item['surrogate_key'] = response.headers.get('Surrogate-Key', response.headers.get('Cache-Tag', b'')).decode('utf-8', errors='ignore')
+        item['age_seconds'] = response.headers.get('Age', b'').decode('utf-8', errors='ignore')
+        item['cf_cache_status'] = response.headers.get('CF-Cache-Status', b'').decode('utf-8', errors='ignore')
+        item['pragma'] = response.headers.get('Pragma', b'').decode('utf-8', errors='ignore')
 
         item['has_video'] = len(response.css('video, iframe[src*="youtube"], iframe[src*="reel"]')) > 0
 

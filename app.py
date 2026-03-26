@@ -226,32 +226,56 @@ def mcard(col, label, value, color=""):
         unsafe_allow_html=True
     )
 
-PROJECT_DIR  = os.path.dirname(os.path.abspath(__file__))
-SPIDER_PATH  = os.path.join(PROJECT_DIR, "reeltor_seo_from_txt.py")
-SITEMAP_BASE = "https://www.reeltor.com/sitemap/{}.xml"
+PROJECT_DIR        = os.path.dirname(os.path.abspath(__file__))
+SPIDER_PATH        = os.path.join(PROJECT_DIR, "reeltor_seo_from_txt.py")
+SITEMAP_INDEX_URL  = "https://www.reeltor.com/sitemap-index.xml"
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; SEOAuditor/1.0)"}
 
 
-def fetch_sitemap_urls(number: int) -> tuple[list[str], str]:
-    """Fetch URLs from reeltor sitemap. Returns (urls, error_message)."""
-    url = SITEMAP_BASE.format(number)
+def fetch_sitemap_index() -> tuple[list[str], str]:
+    """Fetch all sitemap locs from sitemap-index.xml."""
     try:
-        resp = requests.get(url, timeout=15)
-        if resp.status_code == 404:
-            return [], f"No sitemap found at {url} (404)"
+        resp = requests.get(SITEMAP_INDEX_URL, timeout=15, headers=HEADERS)
         if resp.status_code != 200:
-            return [], f"HTTP {resp.status_code} fetching {url}"
+            return [], f"HTTP {resp.status_code} fetching sitemap index"
+        root = ET.fromstring(resp.content)
+        ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+        locs = [loc.text.strip() for loc in root.findall(".//sm:loc", ns) if loc.text]
+        return locs, ""
+    except ET.ParseError:
+        return [], "Sitemap index could not be parsed as XML."
+    except Exception as exc:
+        return [], str(exc)
+
+
+def fetch_urls_from_sitemap(sitemap_url: str) -> tuple[list[str], str]:
+    """Fetch page URLs from a single sitemap XML. Returns (urls, error_message)."""
+    try:
+        resp = requests.get(sitemap_url, timeout=15, headers=HEADERS)
+        if resp.status_code == 404:
+            return [], f"404 — {sitemap_url}"
+        if resp.status_code != 200:
+            return [], f"HTTP {resp.status_code} fetching {sitemap_url}"
         root = ET.fromstring(resp.content)
         ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
         urls = [loc.text.strip() for loc in root.findall(".//sm:loc", ns) if loc.text]
         if not urls:
-            return [], "Sitemap found but contains no <loc> URLs."
+            return [], f"No <loc> URLs in {sitemap_url}"
         return urls, ""
-    except requests.exceptions.ConnectionError:
-        return [], f"Could not connect to {url}"
     except ET.ParseError:
-        return [], "Sitemap response could not be parsed as XML."
+        return [], f"Could not parse XML from {sitemap_url}"
     except Exception as exc:
         return [], str(exc)
+
+
+def _sitemap_label(url: str) -> str:
+    """Human-readable label for a sitemap URL."""
+    import re
+    # e.g. /sitemap/3.xml → "sitemap/3"  |  /sitemap-news.xml → "news"
+    name = url.rstrip("/").split("/")[-1].replace(".xml", "")
+    # strip generic prefix
+    name = re.sub(r"^sitemap[-_]?", "", name)
+    return name or url
 
 
 def run_spider(urls_file: str, output_file: str) -> tuple[bool, str]:
@@ -296,61 +320,154 @@ def run_spider(urls_file: str, output_file: str) -> tuple[bool, str]:
         return False, str(exc)
 
 
+# ─── session state defaults ───────────────────────────────────────────────────
+for key, default in [
+    ("sitemap_index", []),
+    ("sitemap_urls", []),
+    ("input_mode", "Sitemap"),
+]:
+    if key not in st.session_state:
+        st.session_state[key] = default
+
 # ─── sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## SEO Auditor")
     st.markdown("---")
 
-    st.markdown("**Step 1 — Sitemap Number**")
-    st.markdown(
-        '<span style="font-size:12px;color:#8b949e">reeltor.com/sitemap/<b style="color:#58a6ff">N</b>.xml</span>',
-        unsafe_allow_html=True,
-    )
-    sitemap_number = st.number_input(
-        "Sitemap number",
-        min_value=1,
-        step=1,
-        value=1,
+    input_mode = st.radio(
+        "Input mode",
+        ["Sitemap", "Single URL"],
+        horizontal=True,
         label_visibility="collapsed",
     )
-    fetch_btn = st.button("Fetch Sitemap", use_container_width=True)
 
     url_count = 0
     urls_preview: list[str] = []
 
-    if fetch_btn:
-        with st.spinner(f"Fetching sitemap {int(sitemap_number)}…"):
-            fetched_urls, err = fetch_sitemap_urls(int(sitemap_number))
-        if err:
-            st.error(err)
-            st.session_state["sitemap_urls"] = []
-        else:
-            st.session_state["sitemap_urls"] = fetched_urls
-            st.session_state["sitemap_number"] = int(sitemap_number)
+    # ── MODE A: Sitemap ────────────────────────────────────────────────────
+    if input_mode == "Sitemap":
+        st.markdown("**Step 1 — Load Sitemaps**")
 
-    if st.session_state.get("sitemap_urls"):
-        all_urls = st.session_state["sitemap_urls"]
-        total_available = len(all_urls)
-        st.success(f"{total_available} URL{'s' if total_available != 1 else ''} from sitemap {st.session_state.get('sitemap_number', '')}")
+        fetch_index_btn = st.button("Fetch Available Sitemaps", use_container_width=True)
+        if fetch_index_btn:
+            with st.spinner("Fetching sitemap index…"):
+                index_locs, err = fetch_sitemap_index()
+            if err:
+                st.error(err)
+                st.session_state["sitemap_index"] = []
+            else:
+                st.session_state["sitemap_index"] = index_locs
 
-        url_limit = st.slider(
-            "How many URLs to process",
-            min_value=1,
-            max_value=total_available,
-            value=min(50, total_available),
-            step=1,
-        )
-        urls_preview = all_urls[:url_limit]
-        url_count = len(urls_preview)
+        sitemap_index = st.session_state.get("sitemap_index", [])
 
-        with st.expander("Preview URLs"):
-            for u in urls_preview[:20]:
-                st.markdown(
-                    f'<span style="font-size:12px;color:#58a6ff">{u}</span>',
-                    unsafe_allow_html=True,
+        if sitemap_index:
+            # Split into numbered vs named
+            import re
+            numbered = sorted(
+                [u for u in sitemap_index if re.search(r"/sitemap/\d+\.xml$", u)],
+                key=lambda u: int(re.search(r"/(\d+)\.xml$", u).group(1))
+            )
+            named = [u for u in sitemap_index if u not in numbered]
+
+            # Named sitemaps — multiselect
+            named_labels = {_sitemap_label(u): u for u in named}
+            if named_labels:
+                st.markdown("**Named sitemaps**")
+                sel_named_labels = st.multiselect(
+                    "Named sitemaps",
+                    options=list(named_labels.keys()),
+                    default=[],
+                    label_visibility="collapsed",
                 )
-            if url_count > 20:
-                st.caption(f"… and {url_count - 20} more")
+            else:
+                sel_named_labels = []
+
+            # Numbered sitemaps — range
+            if numbered:
+                nums = [int(re.search(r"/(\d+)\.xml$", u).group(1)) for u in numbered]
+                min_n, max_n = min(nums), max(nums)
+                st.markdown(f"**Numbered sitemaps** ({min_n}–{max_n} available)")
+                num_range = st.slider(
+                    "Select range",
+                    min_value=min_n,
+                    max_value=max_n,
+                    value=(min_n, min(min_n, max_n)),
+                    step=1,
+                    label_visibility="collapsed",
+                )
+            else:
+                num_range = (0, 0)
+
+            fetch_btn = st.button("Fetch Selected Sitemaps", use_container_width=True)
+            if fetch_btn:
+                selected_urls: list[str] = []
+                errors_list: list[str] = []
+
+                # Fetch named
+                for lbl in sel_named_labels:
+                    u, e = fetch_urls_from_sitemap(named_labels[lbl])
+                    selected_urls.extend(u)
+                    if e:
+                        errors_list.append(e)
+
+                # Fetch numbered range
+                if numbered and num_range[1] >= num_range[0]:
+                    range_urls = [
+                        u for u in numbered
+                        if num_range[0] <= int(re.search(r"/(\d+)\.xml$", u).group(1)) <= num_range[1]
+                    ]
+                    for su in range_urls:
+                        u, e = fetch_urls_from_sitemap(su)
+                        selected_urls.extend(u)
+                        if e:
+                            errors_list.append(e)
+
+                if errors_list:
+                    st.warning("\n".join(errors_list))
+                if selected_urls:
+                    st.session_state["sitemap_urls"] = selected_urls
+                else:
+                    st.error("No URLs fetched. Select at least one sitemap above.")
+
+        if st.session_state.get("sitemap_urls"):
+            all_urls = st.session_state["sitemap_urls"]
+            total_available = len(all_urls)
+            st.success(f"{total_available} URL{'s' if total_available != 1 else ''} loaded")
+
+            url_limit = st.slider(
+                "How many URLs to process",
+                min_value=1,
+                max_value=total_available,
+                value=min(50, total_available),
+                step=1,
+            )
+            urls_preview = all_urls[:url_limit]
+            url_count = len(urls_preview)
+
+            with st.expander("Preview URLs"):
+                for u in urls_preview[:20]:
+                    st.markdown(
+                        f'<span style="font-size:12px;color:#58a6ff">{u}</span>',
+                        unsafe_allow_html=True,
+                    )
+                if url_count > 20:
+                    st.caption(f"… and {url_count - 20} more")
+
+    # ── MODE B: Single URL ─────────────────────────────────────────────────
+    else:
+        st.markdown("**Paste a URL to analyse**")
+        single_url = st.text_input(
+            "URL",
+            placeholder="https://www.reeltor.com/...",
+            label_visibility="collapsed",
+        ).strip()
+        if single_url:
+            if not single_url.startswith("http"):
+                st.error("URL must start with http:// or https://")
+            else:
+                urls_preview = [single_url]
+                url_count = 1
+                st.success("1 URL ready")
 
     st.markdown("---")
     st.markdown("**Step 2 — Run Analysis**")
@@ -367,7 +484,6 @@ with st.sidebar:
         st.markdown("---")
         st.markdown("**Filters**")
 
-        # Build status code options with counts
         from collections import Counter
         status_counts = Counter(str(d.get("status_code", "")) for d in data)
         status_options = sorted(status_counts.keys())
@@ -431,9 +547,7 @@ if analyze_btn and url_count > 0:
     tmp_urls.write("\n".join(urls_preview))
     tmp_urls.close()
 
-    tmp_out = tempfile.NamedTemporaryFile(
-        suffix=".json", delete=False
-    )
+    tmp_out = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
     tmp_out.close()
     output_path = tmp_out.name
 
@@ -770,37 +884,41 @@ with tab2:
             html += row("WebP Images",         plain(page.get("webp_images", 0)))
             st.markdown(html, unsafe_allow_html=True)
 
-            img_urls = page.get("image_urls", [])
+            img_urls      = page.get("image_urls", [])
+            lazy_urls     = page.get("lazy_image_urls", [])
+            webp_urls     = page.get("webp_image_urls", [])
+            wh_urls       = page.get("wh_image_urls", [])
+
             if img_urls:
-                img_list_tab, img_preview_tab = st.tabs([
-                    f"All URLs ({len(img_urls)})",
-                    "Preview",
+                def _img_grid(tab, urls):
+                    with tab:
+                        if not urls:
+                            st.caption("None found.")
+                            return
+                        cols_per_row = 3
+                        for i in range(0, len(urls), cols_per_row):
+                            chunk = urls[i:i + cols_per_row]
+                            cols = st.columns(cols_per_row)
+                            for col, url in zip(cols, chunk):
+                                try:
+                                    col.image(url, use_container_width=True)
+                                except Exception:
+                                    col.markdown(
+                                        f'<div style="font-size:11px;color:#f85149;'
+                                        f'word-break:break-all">Could not load:<br>{url}</div>',
+                                        unsafe_allow_html=True,
+                                    )
+
+                t_all, t_lazy, t_webp, t_wh = st.tabs([
+                    f"All ({len(img_urls)})",
+                    f"Lazy ({len(lazy_urls)})",
+                    f"WebP ({len(webp_urls)})",
+                    f"W & H ({len(wh_urls)})",
                 ])
-                with img_list_tab:
-                    items_html = "".join(
-                        f'<div style="padding:5px 0;border-bottom:1px solid #21262d;'
-                        f'font-size:12px;color:#8b949e;word-break:break-all">'
-                        f'<span style="color:#58a6ff;margin-right:6px">{i}.</span>{u}</div>'
-                        for i, u in enumerate(img_urls, 1)
-                    )
-                    st.markdown(
-                        f'<div style="max-height:250px;overflow-y:auto">{items_html}</div>',
-                        unsafe_allow_html=True,
-                    )
-                with img_preview_tab:
-                    cols_per_row = 3
-                    for i in range(0, len(img_urls), cols_per_row):
-                        chunk = img_urls[i:i + cols_per_row]
-                        cols = st.columns(cols_per_row)
-                        for col, url in zip(cols, chunk):
-                            try:
-                                col.image(url, use_container_width=True)
-                            except Exception:
-                                col.markdown(
-                                    f'<div style="font-size:11px;color:#f85149;word-break:break-all">'
-                                    f'Could not load:<br>{url}</div>',
-                                    unsafe_allow_html=True,
-                                )
+                _img_grid(t_all,  img_urls)
+                _img_grid(t_lazy, lazy_urls)
+                _img_grid(t_webp, webp_urls)
+                _img_grid(t_wh,   wh_urls)
 
         # 6. Technical SEO
         with st.expander("Technical SEO"):
@@ -816,7 +934,46 @@ with tab2:
             html += row("Has Video",    bool_badge(page.get("has_video")))
             html += row("Last Modified", plain(page.get("last_modified", "")))
             html += row("Server",       plain(page.get("server", "")))
-            html += row("Cache Control", plain(page.get("cache_control", "")))
+            st.markdown(html, unsafe_allow_html=True)
+
+        # 6b. Cache
+        with st.expander("Cache"):
+            import re as _re
+
+            def _cache_hit_badge(val):
+                v = str(val).upper()
+                if v == "HIT":    return badge("HIT",    "green")
+                if v == "MISS":   return badge("MISS",   "red")
+                if v == "BYPASS": return badge("BYPASS", "yellow")
+                if v == "STALE":  return badge("STALE",  "yellow")
+                if v == "REVALIDATED": return badge("REVALIDATED", "blue")
+                return badge(val or "—", "gray")
+
+            # Parse max-age from Cache-Control and convert to days
+            cc = page.get("cache_control", "")
+            max_age_days = None
+            ma_match = _re.search(r"max-age=(\d+)", cc)
+            if ma_match:
+                secs = int(ma_match.group(1))
+                max_age_days = round(secs / 86400, 2)
+
+            age_raw = page.get("age_seconds", "")
+            age_display = ""
+            if age_raw:
+                try:
+                    age_display = f"{int(age_raw)}s (~{round(int(age_raw)/3600, 1)}h)"
+                except ValueError:
+                    age_display = age_raw
+
+            html = ""
+            html += row("Cache-Control",      plain(cc))
+            html += row("max-age",            badge(f"{max_age_days} days", "blue") if max_age_days is not None else badge("—", "gray"))
+            html += row("Age (time in cache)", plain(age_display))
+            html += row("X-Vercel-Cache",     _cache_hit_badge(page.get("x_vercel_cache", "")))
+            html += row("CF-Cache-Status",    _cache_hit_badge(page.get("cf_cache_status", "")))
+            html += row("CDN-Cache-Control",  plain(page.get("cdn_cache_control", "")))
+            html += row("Surrogate-Key",      plain(page.get("surrogate_key", "")))
+            html += row("Pragma",             plain(page.get("pragma", "")))
             st.markdown(html, unsafe_allow_html=True)
 
         # 7. Open Graph & Social
