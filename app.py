@@ -724,10 +724,40 @@ with tab2:
             html += row("Total Links",    plain(page.get("total_links", 0)))
             html += row("Internal Links", badge(page.get("internal_links", 0), "green"))
             html += row("External Links", plain(page.get("external_links", 0)))
+            html += row("Other Links",    plain(page.get("total_links", 0) - page.get("internal_links", 0) - page.get("external_links", 0)))
             html += row("Nofollow Links", plain(page.get("nofollow_links", 0)))
             html += row("Rel Next",       plain(page.get("rel_next", "")))
             html += row("Rel Prev",       plain(page.get("rel_prev", "")))
             st.markdown(html, unsafe_allow_html=True)
+
+            int_links  = page.get("internal_links_list", [])
+            ext_links  = page.get("external_links_list", [])
+            oth_links  = page.get("other_links_list", [])
+
+            link_tab_i, link_tab_e, link_tab_o = st.tabs([
+                f"Internal ({len(int_links)})",
+                f"External ({len(ext_links)})",
+                f"Other ({len(oth_links)})",
+            ])
+
+            def _render_links(tab, links, color):
+                with tab:
+                    if not links:
+                        st.caption("None found.")
+                    else:
+                        items_html = "".join(
+                            f'<div style="padding:5px 0;border-bottom:1px solid #21262d;'
+                            f'font-size:12px;color:{color};word-break:break-all">{l}</div>'
+                            for l in links
+                        )
+                        st.markdown(
+                            f'<div style="max-height:250px;overflow-y:auto">{items_html}</div>',
+                            unsafe_allow_html=True,
+                        )
+
+            _render_links(link_tab_i, int_links, "#3fb950")
+            _render_links(link_tab_e, ext_links, "#58a6ff")
+            _render_links(link_tab_o, oth_links, "#8b949e")
 
         # 5. Images
         with st.expander("Images"):
@@ -739,6 +769,38 @@ with tab2:
             html += row("Images with W & H",   plain(page.get("images_with_width_height", 0)))
             html += row("WebP Images",         plain(page.get("webp_images", 0)))
             st.markdown(html, unsafe_allow_html=True)
+
+            img_urls = page.get("image_urls", [])
+            if img_urls:
+                img_list_tab, img_preview_tab = st.tabs([
+                    f"All URLs ({len(img_urls)})",
+                    "Preview",
+                ])
+                with img_list_tab:
+                    items_html = "".join(
+                        f'<div style="padding:5px 0;border-bottom:1px solid #21262d;'
+                        f'font-size:12px;color:#8b949e;word-break:break-all">'
+                        f'<span style="color:#58a6ff;margin-right:6px">{i}.</span>{u}</div>'
+                        for i, u in enumerate(img_urls, 1)
+                    )
+                    st.markdown(
+                        f'<div style="max-height:250px;overflow-y:auto">{items_html}</div>',
+                        unsafe_allow_html=True,
+                    )
+                with img_preview_tab:
+                    cols_per_row = 3
+                    for i in range(0, len(img_urls), cols_per_row):
+                        chunk = img_urls[i:i + cols_per_row]
+                        cols = st.columns(cols_per_row)
+                        for col, url in zip(cols, chunk):
+                            try:
+                                col.image(url, use_container_width=True)
+                            except Exception:
+                                col.markdown(
+                                    f'<div style="font-size:11px;color:#f85149;word-break:break-all">'
+                                    f'Could not load:<br>{url}</div>',
+                                    unsafe_allow_html=True,
+                                )
 
         # 6. Technical SEO
         with st.expander("Technical SEO"):

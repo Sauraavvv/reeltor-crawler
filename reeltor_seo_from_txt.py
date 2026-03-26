@@ -32,11 +32,15 @@ class ReeltorSeoItem(scrapy.Item):
 
     total_images = scrapy.Field()
     images_without_alt = scrapy.Field()
+    image_urls = scrapy.Field()
 
     total_links = scrapy.Field()
     internal_links = scrapy.Field()
     external_links = scrapy.Field()
     nofollow_links = scrapy.Field()
+    internal_links_list = scrapy.Field()
+    external_links_list = scrapy.Field()
+    other_links_list = scrapy.Field()
 
     og_title = scrapy.Field()
     og_description = scrapy.Field()
@@ -217,16 +221,25 @@ class ReeltorSeoSpider(scrapy.Spider):
             if img.attrib.get('width') and img.attrib.get('height')
         ])
         item['webp_images'] = len(response.css('img[src*=".webp"], source[type="image/webp"]'))
+        item['image_urls'] = list(dict.fromkeys(
+            src for img in images
+            for src in [img.attrib.get('src', '').strip()]
+            if src
+        ))
 
         all_links = response.css('a::attr(href)').getall()
         parsed = urlparse(response.url)
         base_domain = parsed.netloc
         internal = [l for l in all_links if base_domain in l or l.startswith('/')]
         external = [l for l in all_links if l.startswith(('http', '//')) and base_domain not in l]
+        other = [l for l in all_links if l not in internal and l not in external]
         item['total_links'] = len(all_links)
         item['internal_links'] = len(internal)
         item['external_links'] = len(external)
         item['nofollow_links'] = len(response.css('a[rel*="nofollow"]'))
+        item['internal_links_list'] = list(dict.fromkeys(internal))
+        item['external_links_list'] = list(dict.fromkeys(external))
+        item['other_links_list'] = list(dict.fromkeys(other))
 
         item['og_title'] = response.css('meta[property="og:title"]::attr(content)').get(default='')
         item['og_description'] = response.css('meta[property="og:description"]::attr(content)').get(default='')
