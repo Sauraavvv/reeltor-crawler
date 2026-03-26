@@ -148,7 +148,13 @@ st.markdown("""
 
     #MainMenu { visibility: hidden; }
     footer    { visibility: hidden; }
-    header    { visibility: hidden; }
+
+    /* Hide only the toolbar/decoration inside header, NOT the whole header.
+       The sidebar re-open button lives inside the header — hiding the full
+       header hides it too, leaving no way to reopen the sidebar. */
+    header { background: transparent !important; }
+    [data-testid="stDecoration"] { display: none !important; }
+    [data-testid="stToolbar"]    { visibility: hidden !important; }
 
     div[data-testid="stDownloadButton"] button {
         background: #1f6feb !important;
