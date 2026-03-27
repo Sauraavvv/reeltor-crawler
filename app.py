@@ -261,8 +261,7 @@ def fetch_urls_from_sitemap(sitemap_url: str) -> tuple[list[str], str]:
     except Exception as exc:
         return [], str(exc)
 
-def run_spider(urls_file: str, output_file: str, total_urls: int = 0,
-               prog_text=None, prog_bar=None) -> tuple[bool, str]:
+def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[bool, str]:
     cmd = [
         sys.executable, "-m", "scrapy", "runspider",
         SPIDER_PATH,
@@ -282,7 +281,8 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0,
             cwd=PROJECT_DIR,
         )
 
-        log_placeholder = st.empty()
+        prog_placeholder = st.empty()
+        log_placeholder  = st.empty()
         done_count = 0
 
         for line in iter(process.stdout.readline, ""):
@@ -293,22 +293,31 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0,
                     done_count += 1
                 visible = "\n".join(log_lines[-12:])
 
+            if total_urls > 0:
+                pct       = min(done_count / total_urls, 1.0)
+                filled    = int(pct * 30)
+                bar_html  = (
+                    f'<div style="background:#21262d;border-radius:6px;height:10px;'
+                    f'overflow:hidden;margin:6px 0 4px 0">'
+                    f'<div style="background:#1f6feb;width:{int(pct*100)}%;height:100%;'
+                    f'border-radius:6px;transition:width 0.3s"></div></div>'
+                )
+                prog_placeholder.markdown(
+                    f'<div style="font-size:12px;color:#8b949e">'
+                    f'Crawled <b style="color:#e6edf3">{done_count}</b> / '
+                    f'<b style="color:#e6edf3">{total_urls}</b> URLs '
+                    f'<b style="color:#58a6ff">({int(pct*100)}%)</b>'
+                    f'</div>{bar_html}',
+                    unsafe_allow_html=True,
+                )
+
             log_placeholder.markdown(
                 f'<div class="log-box">{visible}</div>',
                 unsafe_allow_html=True,
             )
 
-            if total_urls > 0 and prog_text and prog_bar:
-                pct = min(done_count / total_urls, 1.0)
-                prog_text.markdown(
-                    f'<div style="font-size:12px;color:#8b949e;margin-bottom:4px">'
-                    f'Crawled <b style="color:#e6edf3">{done_count}</b> of '
-                    f'<b style="color:#e6edf3">{total_urls}</b> URLs</div>',
-                    unsafe_allow_html=True,
-                )
-                prog_bar.progress(pct)
-
         process.wait()
+        prog_placeholder.empty()
         log_placeholder.empty()
         return process.returncode == 0, "\n".join(log_lines)
 
@@ -561,19 +570,8 @@ if analyze_btn and url_count > 0:
         unsafe_allow_html=True,
     )
 
-    _prog_text = st.empty()
-    _prog_bar  = st.empty()
-
     with st.spinner("I'm working, sit back and have some popcorns :)"):
-        success, log_text = run_spider(
-            tmp_urls.name, output_path,
-            total_urls=len(all_urls_to_crawl),
-            prog_text=_prog_text,
-            prog_bar=_prog_bar,
-        )
-
-    _prog_text.empty()
-    _prog_bar.empty()
+        success, log_text = run_spider(tmp_urls.name, output_path, total_urls=len(all_urls_to_crawl))
 
     st.session_state.last_run_log = log_text
 
