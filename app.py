@@ -261,6 +261,7 @@ def fetch_urls_from_sitemap(sitemap_url: str) -> tuple[list[str], str]:
         return [], str(exc)
 
 def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[bool, str]:
+    import time
     cmd = [
         sys.executable, "-m", "scrapy", "runspider",
         SPIDER_PATH,
@@ -268,8 +269,10 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[b
         "-O", output_file,
         "--logfile", "-",
     ]
+
     log_lines: list[str] = []
-    log_lock = threading.Lock()
+    done_count = [0]
+    finished   = [False]
 
     try:
         process = subprocess.Popen(
@@ -280,44 +283,43 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[b
             cwd=PROJECT_DIR,
         )
 
-        prog_placeholder = st.empty()
-        log_placeholder  = st.empty()
-        done_count = 0
-
-        for line in iter(process.stdout.readline, ""):
-            line = line.rstrip()
-            with log_lock:
+        def _reader():
+            for line in iter(process.stdout.readline, ""):
+                line = line.rstrip()
                 log_lines.append(line)
                 if "Crawled (" in line:
-                    done_count += 1
-                visible = "\n".join(log_lines[-12:])
+                    done_count[0] += 1
+            process.wait()
+            finished[0] = True
 
-            if total_urls > 0:
-                pct       = min(done_count / total_urls, 1.0)
-                filled    = int(pct * 30)
-                bar_html  = (
-                    f'<div style="background:#21262d;border-radius:6px;height:10px;'
-                    f'overflow:hidden;margin:6px 0 4px 0">'
-                    f'<div style="background:#1f6feb;width:{int(pct*100)}%;height:100%;'
-                    f'border-radius:6px;transition:width 0.3s"></div></div>'
-                )
-                prog_placeholder.markdown(
-                    f'<div style="font-size:12px;color:#8b949e">'
-                    f'Crawled <b style="color:#e6edf3">{done_count}</b> / '
-                    f'<b style="color:#e6edf3">{total_urls}</b> URLs '
-                    f'<b style="color:#58a6ff">({int(pct*100)}%)</b>'
-                    f'</div>{bar_html}',
-                    unsafe_allow_html=True,
-                )
+        t = threading.Thread(target=_reader, daemon=True)
+        t.start()
 
-            log_placeholder.markdown(
-                f'<div class="log-box">{visible}</div>',
+        status_text = st.empty()
+        prog_bar    = st.progress(0)
+
+        while not finished[0]:
+            n   = done_count[0]
+            pct = min(n / total_urls, 1.0) if total_urls > 0 else 0
+            status_text.markdown(
+                f'<div style="font-size:13px;color:#8b949e;margin-bottom:4px">'
+                f'Crawled <b style="color:#e6edf3">{n}</b> / '
+                f'<b style="color:#e6edf3">{total_urls}</b> URLs '
+                f'— <b style="color:#58a6ff">{int(pct * 100)}%</b></div>',
                 unsafe_allow_html=True,
             )
+            prog_bar.progress(pct)
+            time.sleep(0.5)
 
-        process.wait()
-        prog_placeholder.empty()
-        log_placeholder.empty()
+        n = done_count[0]
+        status_text.markdown(
+            f'<div style="font-size:13px;color:#3fb950;margin-bottom:4px">'
+            f'Done — crawled <b>{n}</b> URLs.</div>',
+            unsafe_allow_html=True,
+        )
+        prog_bar.progress(1.0)
+        t.join()
+
         return process.returncode == 0, "\n".join(log_lines)
 
     except Exception as exc:
