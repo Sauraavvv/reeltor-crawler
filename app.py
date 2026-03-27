@@ -638,7 +638,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("---")
 
 # ─── tabs ─────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["All Pages", "Page Inspector", "Last Run Log", "Analytics Dashboard", "URL Inspector"])
+tab1, tab2, tab5, tab4, tab3 = st.tabs(["All Pages", "Page Inspector", "URL Inspector", "Analytics Dashboard", "Last Run Log"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
