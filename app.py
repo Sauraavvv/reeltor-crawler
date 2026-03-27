@@ -9,7 +9,6 @@ import threading
 import requests
 import xml.etree.ElementTree as ET
 
-# ─── page config ─────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="SEO Site Auditor",
     page_icon="",
@@ -17,7 +16,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ─── styles ──────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
     .stApp { background-color: #0d1117; color: #e6edf3; }
@@ -151,7 +149,6 @@ st.markdown("""
     header    { visibility: hidden; }
     [data-testid="stSidebarCollapseButton"] { display: none !important; }
 
-
     div[data-testid="stDownloadButton"] button {
         background: #1f6feb !important;
         color: #fff !important;
@@ -165,7 +162,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ─── session state ────────────────────────────────────────────────────────────
 for key, default in [
     ("data", []),
     ("output_json_bytes", None),
@@ -175,8 +171,6 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-
-# ─── helpers ─────────────────────────────────────────────────────────────────
 def badge(val, kind="gray"):
     return f'<span class="badge badge-{kind}">{val}</span>'
 
@@ -232,7 +226,6 @@ SPIDER_PATH        = os.path.join(PROJECT_DIR, "reeltor_seo_from_txt.py")
 SITEMAP_INDEX_URL  = "https://www.reeltor.com/sitemap-index.xml"
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; SEOAuditor/1.0)"}
 
-
 def fetch_sitemap_index() -> tuple[list[str], str]:
     """Fetch all sitemap locs from sitemap-index.xml."""
     try:
@@ -247,7 +240,6 @@ def fetch_sitemap_index() -> tuple[list[str], str]:
         return [], "Sitemap index could not be parsed as XML."
     except Exception as exc:
         return [], str(exc)
-
 
 def fetch_urls_from_sitemap(sitemap_url: str) -> tuple[list[str], str]:
     """Fetch page URLs from a single sitemap XML. Returns (urls, error_message)."""
@@ -268,16 +260,14 @@ def fetch_urls_from_sitemap(sitemap_url: str) -> tuple[list[str], str]:
     except Exception as exc:
         return [], str(exc)
 
-
-
 def run_spider(urls_file: str, output_file: str) -> tuple[bool, str]:
     """Run the scrapy spider and return (success, log_text)."""
     cmd = [
         sys.executable, "-m", "scrapy", "runspider",
         SPIDER_PATH,
         "-a", f"urls_file={urls_file}",
-        "-O", output_file,          # -O overwrites output file
-        "--logfile", "-",           # log to stdout/stderr
+        "-O", output_file,                                     
+        "--logfile", "-",                                 
     ]
     log_lines: list[str] = []
     log_lock = threading.Lock()
@@ -286,7 +276,7 @@ def run_spider(urls_file: str, output_file: str) -> tuple[bool, str]:
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,   # merge stderr into stdout
+            stderr=subprocess.STDOUT,                             
             text=True,
             cwd=PROJECT_DIR,
         )
@@ -297,7 +287,7 @@ def run_spider(urls_file: str, output_file: str) -> tuple[bool, str]:
             line = line.rstrip()
             with log_lock:
                 log_lines.append(line)
-                # Show last 12 lines live
+                                         
                 visible = "\n".join(log_lines[-12:])
             log_placeholder.markdown(
                 f'<div class="log-box">{visible}</div>',
@@ -311,8 +301,6 @@ def run_spider(urls_file: str, output_file: str) -> tuple[bool, str]:
     except Exception as exc:
         return False, str(exc)
 
-
-# ─── session state defaults ───────────────────────────────────────────────────
 for key, default in [
     ("sitemap_index", []),
     ("sitemap_urls", []),
@@ -321,7 +309,6 @@ for key, default in [
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ─── sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## SEO Auditor")
     st.markdown("---")
@@ -336,7 +323,6 @@ with st.sidebar:
     url_count = 0
     urls_preview: list[str] = []
 
-    # ── MODE A: Sitemap ────────────────────────────────────────────────────
     if input_mode == "Sitemap":
         st.markdown("**Step 1 — Load Sitemaps**")
 
@@ -356,10 +342,6 @@ with st.sidebar:
             import re
             from collections import defaultdict
 
-            # Group sitemaps by category:
-            #   /sitemap/N.xml            → category "main"
-            #   /sitemap/CATEGORY/N.xml   → category CATEGORY  (vastu, news, blogs, 15k …)
-            #   anything else             → category "__standalone__"
             grouped: dict[str, list[tuple]] = defaultdict(list)
             for u in sitemap_index:
                 m_cat = re.search(r"/sitemap/([^/]+)/(\d+)\.xml", u)
@@ -371,11 +353,9 @@ with st.sidebar:
                 else:
                     grouped["__standalone__"].append((None, u))
 
-            # Sort entries within each group by number
             for cat in grouped:
                 grouped[cat].sort(key=lambda x: (x[0] is None, x[0]))
 
-            # ── Per-category range sliders ──────────────────────────────
             cat_ranges: dict[str, tuple[int, int]] = {}
             cat_enabled: dict[str, bool] = {}
 
@@ -450,7 +430,6 @@ with st.sidebar:
                 if url_count > 20:
                     st.caption(f"… and {url_count - 20} more")
 
-    # ── MODE B: Single URL ─────────────────────────────────────────────────
     else:
         st.markdown("**Paste a URL to analyse**")
         single_url = st.text_input(
@@ -475,7 +454,6 @@ with st.sidebar:
         disabled=(url_count == 0),
     )
 
-    # ── Filters (shown only after data is loaded) ──────────────────────────
     data = st.session_state.data
     if data:
         st.markdown("---")
@@ -527,8 +505,6 @@ with st.sidebar:
         sel_index  = "All"
         sel_error  = "— show all —"
 
-
-# ─── run spider when button clicked ──────────────────────────────────────────
 if analyze_btn and url_count > 0:
     tmp_urls = tempfile.NamedTemporaryFile(
         mode="w", suffix=".txt", delete=False, encoding="utf-8"
@@ -567,15 +543,12 @@ if analyze_btn and url_count > 0:
             unsafe_allow_html=True,
         )
 
-    # clean up temp files
     try:
         os.unlink(tmp_urls.name)
         os.unlink(output_path)
     except Exception:
         pass
 
-
-# ─── main area ────────────────────────────────────────────────────────────────
 st.markdown("# SEO Site Audit")
 
 data = st.session_state.data
@@ -599,7 +572,6 @@ if not data:
 """)
     st.stop()
 
-# ─── apply filters ────────────────────────────────────────────────────────────
 filtered = data
 if sel_status:
     filtered = [d for d in filtered if str(d.get("status_code", "")) in sel_status]
@@ -611,7 +583,6 @@ if sel_error != "— show all —":
     fn = error_filters[sel_error]
     filtered = [d for d in filtered if fn(d)]
 
-# ─── summary cards ────────────────────────────────────────────────────────────
 c1, c2, c3, c4, c5, c6, c7 = st.columns(7)
 
 total_f       = len(filtered)
@@ -637,13 +608,8 @@ mcard(c7, "Cache HITs",    cache_hits,    "green" if cache_hits else "yellow")
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("---")
 
-# ─── tabs ─────────────────────────────────────────────────────────────────────
 tab1, tab2, tab5, tab4, tab3 = st.tabs(["All Pages", "Page Inspector", "URL Inspector", "Analytics Dashboard", "Last Run Log"])
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 1 — overview table
-# ══════════════════════════════════════════════════════════════════════════════
 with tab1:
     cols_map = {
         "URL":           lambda d: d.get("url", ""),
@@ -698,10 +664,6 @@ with tab1:
             mime="application/json",
         )
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — page inspector
-# ══════════════════════════════════════════════════════════════════════════════
 with tab2:
     urls_list = [d.get("url", "") for d in filtered]
     if not urls_list:
@@ -719,7 +681,6 @@ with tab2:
 
     left, right = st.columns([3, 1])
 
-    # ── right: quick signals panel ──────────────────────────────────────────
     with right:
         st.markdown('<div class="section-title">Quick Signals</div>', unsafe_allow_html=True)
         signals = {
@@ -745,10 +706,8 @@ with tab2:
             )
             sb.markdown(bool_badge(val), unsafe_allow_html=True)
 
-    # ── left: detail expanders ───────────────────────────────────────────────
     with left:
 
-        # 1. Page Overview
         with st.expander("Page Overview", expanded=True):
             html = ""
             html += row("Status Code",   status_badge(page.get("status_code", "")))
@@ -765,7 +724,6 @@ with tab2:
             html += row("Content Type",  plain(page.get("content_type", "")))
             st.markdown(html, unsafe_allow_html=True)
 
-        # 2. Title & Meta
         with st.expander("Title & Meta Tags"):
             html = ""
             html += row("Title",              plain(page.get("title", "")))
@@ -782,7 +740,6 @@ with tab2:
             html += row("Noarchive",          bool_badge(page.get("has_noarchive")))
             st.markdown(html, unsafe_allow_html=True)
 
-        # 3. Headings & Content
         with st.expander("Headings & Content"):
             html = ""
             html += row("H1 Text",       plain(page.get("h1", "")))
@@ -815,7 +772,6 @@ with tab2:
                         unsafe_allow_html=True,
                     )
 
-        # 4. Links
         with st.expander("Links"):
             html = ""
             html += row("Total Links",    plain(page.get("total_links", 0)))
@@ -856,7 +812,6 @@ with tab2:
             _render_links(link_tab_e, ext_links, "#58a6ff")
             _render_links(link_tab_o, oth_links, "#8b949e")
 
-        # 5. Images
         with st.expander("Images"):
             na = page.get("images_without_alt", 0)
             html = ""
@@ -903,7 +858,6 @@ with tab2:
                 _img_grid(t_webp, webp_urls)
                 _img_grid(t_wh,   wh_urls)
 
-        # 6. Technical SEO
         with st.expander("Technical SEO"):
             html = ""
             html += row("HTTPS",        bool_badge(page.get("url_has_https")))
@@ -919,7 +873,6 @@ with tab2:
             html += row("Server",       plain(page.get("server", "")))
             st.markdown(html, unsafe_allow_html=True)
 
-        # 6b. Cache
         with st.expander("Cache"):
             import re as _re
 
@@ -932,7 +885,6 @@ with tab2:
                 if v == "REVALIDATED": return badge("REVALIDATED")
                 return badge(val or "—")
 
-            # Parse max-age from Cache-Control and convert to days
             cc = page.get("cache_control", "")
             max_age_days = None
             ma_match = _re.search(r"max-age=(\d+)", cc)
@@ -970,7 +922,6 @@ with tab2:
             html += row("Pragma",             plain(page.get("pragma", "")))
             st.markdown(html, unsafe_allow_html=True)
 
-        # 7. Open Graph & Social
         with st.expander("Open Graph & Social"):
             html = ""
             html += row("OG Present",          bool_badge(page.get("og_present")))
@@ -986,7 +937,6 @@ with tab2:
             html += row("Twitter Image",       plain(page.get("twitter_image", "")))
             st.markdown(html, unsafe_allow_html=True)
 
-        # 8. Schema / Structured Data
         with st.expander("Schema & Structured Data"):
             html = ""
             html += row("Schema JSON-LD",    bool_badge(page.get("schema_json_ld") == "YES"))
@@ -999,7 +949,6 @@ with tab2:
             html += row("Real Estate Schema",bool_badge(page.get("has_real_estate_schema")))
             st.markdown(html, unsafe_allow_html=True)
 
-        # 9. Real Estate Signals
         with st.expander("Real Estate Signals"):
             html = ""
             html += row("Has Price",     bool_badge(page.get("has_price")))
@@ -1008,10 +957,6 @@ with tab2:
             html += row("Listing Count", badge(lc, "green" if lc > 0 else "gray"))
             st.markdown(html, unsafe_allow_html=True)
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — last run log
-# ══════════════════════════════════════════════════════════════════════════════
 with tab3:
     log = st.session_state.last_run_log
     if log:
@@ -1028,10 +973,6 @@ with tab3:
     else:
         st.info("No spider run yet. Upload a URL file and click Analyze.")
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 4 — analytics dashboard
-# ══════════════════════════════════════════════════════════════════════════════
 with tab4:
     try:
         import plotly.graph_objects as go
@@ -1045,7 +986,6 @@ with tab4:
 
     N = len(filtered)
 
-    # ── chart theme helper ────────────────────────────────────────────────────
     CHART_BG   = "#0d1117"
     PAPER_BG   = "#161b22"
     FONT_COLOR = "#e6edf3"
@@ -1065,7 +1005,6 @@ with tab4:
         fig.update_yaxes(gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
         return fig
 
-    # ── Section 1: Health Score ───────────────────────────────────────────────
     st.markdown("---")
     st.markdown('<div class="section-title">Site Health Score</div>', unsafe_allow_html=True)
 
@@ -1135,7 +1074,6 @@ with tab4:
 
     st.markdown("---")
 
-    # ── Section 2 & 3: Status codes + Indexability ───────────────────────────
     col_a, col_b = st.columns(2)
 
     with col_a:
@@ -1182,7 +1120,6 @@ with tab4:
 
     st.markdown("---")
 
-    # ── Section 4: Performance ────────────────────────────────────────────────
     st.markdown('<div class="section-title">Performance Distribution</div>', unsafe_allow_html=True)
 
     col_c, col_d = st.columns(2)
@@ -1234,7 +1171,6 @@ with tab4:
 
     st.markdown("---")
 
-    # ── Section 5: Content Quality ────────────────────────────────────────────
     st.markdown('<div class="section-title">Content Quality</div>', unsafe_allow_html=True)
 
     col_e, col_f = st.columns(2)
@@ -1281,7 +1217,6 @@ with tab4:
         _layout(bar_dl, "Meta Description Length Distribution", height=280)
         st.plotly_chart(bar_dl, use_container_width=True)
 
-    # word count distribution
     wc_vals = [d.get("word_count") or 0 for d in filtered]
 
     def _wc_bucket(w):
@@ -1308,7 +1243,6 @@ with tab4:
 
     st.markdown("---")
 
-    # ── Section 6: Link Profile ───────────────────────────────────────────────
     st.markdown('<div class="section-title">Link Profile</div>', unsafe_allow_html=True)
 
     total_int  = sum(d.get("internal_links", 0) or 0 for d in filtered)
@@ -1326,7 +1260,6 @@ with tab4:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Top 10 most linked-to internal pages
     from collections import defaultdict
     link_target_counts: dict = defaultdict(int)
     for d in filtered:
@@ -1351,7 +1284,6 @@ with tab4:
 
     st.markdown("---")
 
-    # ── Section 7: Image Audit ────────────────────────────────────────────────
     st.markdown('<div class="section-title">Image Audit</div>', unsafe_allow_html=True)
 
     total_imgs   = sum(d.get("total_images", 0) or 0 for d in filtered)
@@ -1396,7 +1328,6 @@ with tab4:
 
     st.markdown("---")
 
-    # ── Section 8: Schema & Social Coverage ──────────────────────────────────
     st.markdown('<div class="section-title">Schema & Social Coverage</div>', unsafe_allow_html=True)
 
     has_schema  = sum(1 for d in filtered if d.get("schema_json_ld") == "YES")
@@ -1422,7 +1353,6 @@ with tab4:
     bar_cov.update_layout(yaxis=dict(autorange="reversed"))
     st.plotly_chart(bar_cov, use_container_width=True)
 
-    # Schema type breakdown
     all_types: list = []
     for d in filtered:
         for t in (d.get("schema_types") or []):
@@ -1445,7 +1375,6 @@ with tab4:
 
     st.markdown("---")
 
-    # ── Section 9: URL Structure ──────────────────────────────────────────────
     st.markdown('<div class="section-title">URL Structure</div>', unsafe_allow_html=True)
 
     col_u1, col_u2 = st.columns(2)
@@ -1493,16 +1422,11 @@ with tab4:
     mcard(uc1, "Avg URL Length (chars)", avg_ul, "green" if avg_ul < 100 else "yellow")
     mcard(uc2, "HTTPS Pages", https_yes)
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TAB 5 — URL Inspector
-# ══════════════════════════════════════════════════════════════════════════════
 with tab5:
     if not filtered:
         st.info("No data yet. Run the spider first.")
         st.stop()
 
-    # ── helpers ───────────────────────────────────────────────────────────────
     def _url_block(urls: list[str]) -> str:
         """Render a scrollable list of URLs."""
         items = "".join(
@@ -1545,9 +1469,6 @@ with tab5:
                 key=f"dl_{dl_key}_{len(urls)}",
             )
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 1 — Status Codes
-    # ─────────────────────────────────────────────────────────────────────────
     from collections import defaultdict as _dd
 
     _sc_errors = sum(1 for d in filtered if not str(d.get("status_code", "")).startswith("2"))
@@ -1569,13 +1490,9 @@ with tab5:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 2 — Cache Status
-    # ─────────────────────────────────────────────────────────────────────────
     cache_affected = [d for d in filtered if d.get("x_vercel_cache") or d.get("cf_cache_status")]
     _section_header("Cache Status", len(cache_affected), "")
 
-    # Vercel cache
     vc_groups: dict = _dd(list)
     for d in filtered:
         v = str(d.get("x_vercel_cache") or "").upper() or "NOT SET"
@@ -1586,7 +1503,6 @@ with tab5:
         bc = "green" if status == "HIT" else "red" if status == "MISS" else "yellow" if status in ("BYPASS","STALE") else "gray"
         _group_expander(f"Vercel — {status}", vc_groups[status], f"vercel_{status.lower()}")
 
-    # Cloudflare cache
     cf_groups: dict = _dd(list)
     for d in filtered:
         v = str(d.get("cf_cache_status") or "").upper() or "NOT SET"
@@ -1599,9 +1515,6 @@ with tab5:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 3 — Indexability Issues
-    # ─────────────────────────────────────────────────────────────────────────
     _idx_issues = {
         "Not Indexable":          [d.get("url","") for d in filtered if not d.get("is_indexable")],
         "No Self-Canonical":      [d.get("url","") for d in filtered if not d.get("has_self_canonical")],
@@ -1618,9 +1531,6 @@ with tab5:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 4 — On-Page Issues
-    # ─────────────────────────────────────────────────────────────────────────
     _op_issues = {
         "Missing Title":               [d.get("url","") for d in filtered if not d.get("title")],
         "Title Too Short (<30 chars)": [d.get("url","") for d in filtered
@@ -1644,9 +1554,6 @@ with tab5:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 5 — Performance Issues
-    # ─────────────────────────────────────────────────────────────────────────
     _perf_issues = {
         "Slow Response (>2s)":      [d.get("url","") for d in filtered if (d.get("response_time_ms") or 0) > 2000],
         "Very Slow (>4s)":          [d.get("url","") for d in filtered if (d.get("response_time_ms") or 0) > 4000],
@@ -1662,9 +1569,6 @@ with tab5:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 6 — Content Issues
-    # ─────────────────────────────────────────────────────────────────────────
     _content_issues = {
         "Thin Content (<100 words)":    [d.get("url","") for d in filtered if (d.get("word_count") or 0) < 100],
         "Low Content (100–299 words)":  [d.get("url","") for d in filtered
@@ -1680,9 +1584,6 @@ with tab5:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 7 — Image Issues
-    # ─────────────────────────────────────────────────────────────────────────
     _img_issues = {
         "Images Missing Alt Text":  [d.get("url","") for d in filtered if (d.get("images_without_alt") or 0) > 0],
         "No WebP Images":           [d.get("url","") for d in filtered
@@ -1698,9 +1599,6 @@ with tab5:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 8 — Schema Issues
-    # ─────────────────────────────────────────────────────────────────────────
     _schema_issues = {
         "No Schema at All":       [d.get("url","") for d in filtered if d.get("schema_json_ld") != "YES"],
         "No FAQ Schema":          [d.get("url","") for d in filtered if not d.get("has_faq_schema")],
@@ -1713,7 +1611,6 @@ with tab5:
         bc = "red" if "No Schema" in label else "yellow"
         _group_expander(label, urls, f"schema_{label.lower().replace(' ','_')}")
 
-    # URLs grouped by schema type
     schema_type_groups: dict = _dd(list)
     for d in filtered:
         for t in (d.get("schema_types") or []):
@@ -1726,9 +1623,6 @@ with tab5:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 9 — Social / OG Issues
-    # ─────────────────────────────────────────────────────────────────────────
     _social_issues = {
         "No Open Graph Tags":          [d.get("url","") for d in filtered if not d.get("og_present")],
         "No Twitter Card":             [d.get("url","") for d in filtered if not d.get("twitter_card")],
@@ -1746,9 +1640,6 @@ with tab5:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ─────────────────────────────────────────────────────────────────────────
-    # SECTION 10 — URL Structure Issues
-    # ─────────────────────────────────────────────────────────────────────────
     _url_issues = {
         "HTTP (Non-HTTPS)":       [d.get("url","") for d in filtered if not d.get("url_has_https")],
         "URL Depth 4+":           [d.get("url","") for d in filtered if (d.get("url_depth") or 0) >= 4],
