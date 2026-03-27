@@ -1652,3 +1652,26 @@ with tab5:
     for label, urls in _url_issues.items():
         bc = "red" if "HTTP" in label or "Redirect" in label else "yellow"
         _group_expander(label, urls, f"url_{label.lower().replace(' ','_').replace('(','').replace(')','').replace('+','plus').replace('>','gt').replace('/','')}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    _all_crawled = {d.get("url", "") for d in filtered}
+    _all_linked  = set()
+    for d in filtered:
+        for lnk in (d.get("internal_links_list") or []):
+            _all_linked.add(lnk)
+    _orphan_urls = sorted(_all_crawled - _all_linked)
+
+    _section_header("Orphan URLs", len(_orphan_urls), "", suffix="orphan pages")
+
+    if _orphan_urls:
+        st.markdown(
+            '<div style="font-size:12px;color:#8b949e;margin-bottom:10px">'
+            'These pages exist in your crawl but are not linked from any other crawled page. '
+            'Search engines may struggle to discover or index them.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        _group_expander(f"All Orphan Pages", _orphan_urls, "orphan_urls")
+    else:
+        st.success("No orphan URLs found — every crawled page has at least one internal link pointing to it.")
