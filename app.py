@@ -271,8 +271,7 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[b
     ]
 
     log_lines: list[str] = []
-    done_count = [0]
-    finished   = [False]
+    finished  = [False]
 
     try:
         process = subprocess.Popen(
@@ -285,10 +284,7 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[b
 
         def _reader():
             for line in iter(process.stdout.readline, ""):
-                line = line.rstrip()
-                log_lines.append(line)
-                if "Crawled (" in line:
-                    done_count[0] += 1
+                log_lines.append(line.rstrip())
             process.wait()
             finished[0] = True
 
@@ -299,11 +295,14 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[b
         prog_bar    = st.progress(0)
 
         while not finished[0]:
-            n   = done_count[0]
-            pct = min(n / total_urls, 1.0) if total_urls > 0 else 0
+            try:
+                done = sum(1 for ln in open(output_file, "r", encoding="utf-8") if ln.strip())
+            except Exception:
+                done = 0
+            pct = min(done / total_urls, 1.0) if total_urls > 0 else 0
             status_text.markdown(
                 f'<div style="font-size:13px;color:#8b949e;margin-bottom:4px">'
-                f'Crawled <b style="color:#e6edf3">{n}</b> / '
+                f'Crawled <b style="color:#e6edf3">{done}</b> / '
                 f'<b style="color:#e6edf3">{total_urls}</b> URLs '
                 f'— <b style="color:#58a6ff">{int(pct * 100)}%</b></div>',
                 unsafe_allow_html=True,
@@ -311,10 +310,9 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[b
             prog_bar.progress(pct)
             time.sleep(0.5)
 
-        n = done_count[0]
         status_text.markdown(
             f'<div style="font-size:13px;color:#3fb950;margin-bottom:4px">'
-            f'Done — crawled <b>{n}</b> URLs.</div>',
+            f'Done — <b>{total_urls}</b> URLs crawled.</div>',
             unsafe_allow_html=True,
         )
         prog_bar.progress(1.0)
@@ -536,7 +534,7 @@ if analyze_btn and url_count > 0:
     tmp_urls.write("\n".join(urls_preview))
     tmp_urls.close()
 
-    tmp_out = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
+    tmp_out = tempfile.NamedTemporaryFile(suffix=".jl", delete=False)
     tmp_out.close()
     output_path = tmp_out.name
 
@@ -552,8 +550,8 @@ if analyze_btn and url_count > 0:
 
     if success and os.path.exists(output_path) and os.path.getsize(output_path) > 2:
         with open(output_path, "r", encoding="utf-8") as f:
-            result = json.load(f)
-        st.session_state.data = result if isinstance(result, list) else [result]
+            result = [json.loads(ln) for ln in f if ln.strip()]
+        st.session_state.data = result
         with open(output_path, "rb") as f:
             st.session_state.output_json_bytes = f.read()
         st.session_state.analysis_done = True
