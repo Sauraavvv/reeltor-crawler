@@ -294,17 +294,28 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[b
         status_text = st.empty()
         prog_bar    = st.progress(0)
 
+        import psutil
+        proc = psutil.Process(process.pid)
+
         while not finished[0]:
             try:
                 done = sum(1 for ln in open(output_file, "r", encoding="utf-8") if ln.strip())
             except Exception:
                 done = 0
+            try:
+                mem_mb = round(proc.memory_info().rss / 1024 / 1024, 1)
+                mem_color = "#3fb950" if mem_mb < 500 else "#d29922" if mem_mb < 1000 else "#f85149"
+                ram_html = (f'&nbsp;&nbsp;|&nbsp;&nbsp;'
+                            f'RAM: <b style="color:{mem_color}">{mem_mb} MB</b>')
+            except Exception:
+                ram_html = ""
             pct = min(done / total_urls, 1.0) if total_urls > 0 else 0
             status_text.markdown(
                 f'<div style="font-size:13px;color:#8b949e;margin-bottom:4px">'
                 f'Crawled <b style="color:#e6edf3">{done}</b> / '
                 f'<b style="color:#e6edf3">{total_urls}</b> URLs '
-                f'— <b style="color:#58a6ff">{int(pct * 100)}%</b></div>',
+                f'— <b style="color:#58a6ff">{int(pct * 100)}%</b>'
+                f'{ram_html}</div>',
                 unsafe_allow_html=True,
             )
             prog_bar.progress(pct)
