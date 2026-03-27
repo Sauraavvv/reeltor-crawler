@@ -182,10 +182,10 @@ def badge(val, kind="gray"):
 
 def bool_badge(val):
     if val is True or val == "YES":
-        return badge("Yes", "green")
+        return badge("Yes")
     if val is False or val == "NO":
-        return badge("No", "red")
-    return badge(str(val), "gray")
+        return badge("No")
+    return badge(str(val))
 
 def row(key, val_html):
     return (f'<div class="seo-row">'
@@ -195,28 +195,28 @@ def row(key, val_html):
 
 def plain(val):
     if val is None or val == "":
-        return badge("—", "gray")
+        return badge("—")
     return f'<span>{val}</span>'
 
 def status_badge(code):
     try:
         c = int(code)
         if 200 <= c < 300:
-            return badge(c, "green")
+            return badge(c)
         if 300 <= c < 400:
-            return badge(c, "yellow")
-        return badge(c, "red")
+            return badge(c)
+        return badge(c)
     except Exception:
-        return badge(str(code), "red")
+        return badge(str(code))
 
 def length_badge(length, good_min, good_max):
     try:
         l = int(length)
         if good_min <= l <= good_max:
-            return badge(f"{l} chars", "green")
-        return badge(f"{l} chars", "yellow")
+            return badge(f"{l} chars")
+        return badge(f"{l} chars")
     except Exception:
-        return badge(str(length), "gray")
+        return badge(str(length))
 
 def mcard(col, label, value, color=""):
     col.markdown(
@@ -627,8 +627,8 @@ cache_hits    = sum(
 )
 
 mcard(c1, "Total URLs",    total_f,       "")
-mcard(c2, "2xx OK",        ok_2xx,        "green")
-mcard(c3, "Indexable",     idx,           "green")
+mcard(c2, "2xx OK",        ok_2xx)
+mcard(c3, "Indexable",     idx)
 mcard(c4, "Missing Title", missing_title, "red" if missing_title else "green")
 mcard(c5, "Missing Meta",  missing_desc,  "red" if missing_desc  else "green")
 mcard(c6, "Missing H1",    missing_h1,    "red" if missing_h1    else "green")
@@ -638,7 +638,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("---")
 
 # ─── tabs ─────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["All Pages", "Page Inspector", "Last Run Log"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["All Pages", "Page Inspector", "Last Run Log", "Analytics Dashboard", "URL Inspector"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -819,7 +819,7 @@ with tab2:
         with st.expander("Links"):
             html = ""
             html += row("Total Links",    plain(page.get("total_links", 0)))
-            html += row("Internal Links", badge(page.get("internal_links", 0), "green"))
+            html += row("Internal Links", badge(page.get("internal_links", 0)))
             html += row("External Links", plain(page.get("external_links", 0)))
             html += row("Other Links",    plain(len(page.get("other_links_list", []))))
             html += row("Nofollow Links", plain(page.get("nofollow_links", 0)))
@@ -925,12 +925,12 @@ with tab2:
 
             def _cache_hit_badge(val):
                 v = str(val).upper()
-                if v == "HIT":    return badge("HIT",    "green")
-                if v == "MISS":   return badge("MISS",   "red")
-                if v == "BYPASS": return badge("BYPASS", "yellow")
-                if v == "STALE":  return badge("STALE",  "yellow")
-                if v == "REVALIDATED": return badge("REVALIDATED", "blue")
-                return badge(val or "—", "gray")
+                if v == "HIT":    return badge("HIT")
+                if v == "MISS":   return badge("MISS")
+                if v == "BYPASS": return badge("BYPASS")
+                if v == "STALE":  return badge("STALE")
+                if v == "REVALIDATED": return badge("REVALIDATED")
+                return badge(val or "—")
 
             # Parse max-age from Cache-Control and convert to days
             cc = page.get("cache_control", "")
@@ -950,7 +950,7 @@ with tab2:
 
             html = ""
             html += row("Cache-Control",      plain(cc))
-            html += row("max-age",            badge(f"{max_age_days} days", "blue") if max_age_days is not None else badge("—", "gray"))
+            html += row("max-age",            badge(f"{max_age_days} days") if max_age_days is not None else badge("—"))
             html += row("Age (time in cache)", plain(age_display))
             html += row("X-Vercel-Cache",     _cache_hit_badge(page.get("x_vercel_cache", "")))
             html += row("CF-Cache-Status",    _cache_hit_badge(page.get("cf_cache_status", "")))
@@ -965,7 +965,7 @@ with tab2:
                 )
                 sk_val = f'<div style="text-align:left">{sk_html}</div>'
             else:
-                sk_val = badge("—", "gray")
+                sk_val = badge("—")
             html += row("Surrogate-Key", sk_val)
             html += row("Pragma",             plain(page.get("pragma", "")))
             st.markdown(html, unsafe_allow_html=True)
@@ -992,7 +992,7 @@ with tab2:
             html += row("Schema JSON-LD",    bool_badge(page.get("schema_json_ld") == "YES"))
             html += row("Schema Count",      plain(page.get("schema_count", 0)))
             types = page.get("schema_types", [])
-            types_html = " ".join(badge(t, "blue") for t in types) if types else badge("None", "gray")
+            types_html = " ".join(badge(t) for t in types) if types else badge("None")
             html += row("Schema Types",      types_html)
             html += row("FAQ Schema",        bool_badge(page.get("has_faq_schema")))
             html += row("Breadcrumb Schema", bool_badge(page.get("has_breadcrumb_schema")))
@@ -1027,3 +1027,737 @@ with tab3:
         )
     else:
         st.info("No spider run yet. Upload a URL file and click Analyze.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 4 — analytics dashboard
+# ══════════════════════════════════════════════════════════════════════════════
+with tab4:
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        st.error("Plotly is required for the Analytics Dashboard. Run: pip install plotly")
+        st.stop()
+
+    if not filtered:
+        st.info("No data to analyse. Run the spider first.")
+        st.stop()
+
+    N = len(filtered)
+
+    # ── chart theme helper ────────────────────────────────────────────────────
+    CHART_BG   = "#0d1117"
+    PAPER_BG   = "#161b22"
+    FONT_COLOR = "#e6edf3"
+    GRID_COLOR = "#21262d"
+
+    def _layout(fig, title="", height=320):
+        fig.update_layout(
+            title=dict(text=title, font=dict(color=FONT_COLOR, size=13), x=0),
+            paper_bgcolor=PAPER_BG,
+            plot_bgcolor=CHART_BG,
+            font=dict(color=FONT_COLOR, size=11),
+            margin=dict(l=12, r=12, t=36 if title else 12, b=12),
+            height=height,
+            legend=dict(bgcolor=PAPER_BG, bordercolor=GRID_COLOR, borderwidth=1),
+        )
+        fig.update_xaxes(gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
+        fig.update_yaxes(gridcolor=GRID_COLOR, zerolinecolor=GRID_COLOR)
+        return fig
+
+    # ── Section 1: Health Score ───────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown('<div class="section-title">Site Health Score</div>', unsafe_allow_html=True)
+
+    issues_weight = {
+        "4xx/5xx errors":        (sum(1 for d in filtered if str(d.get("status_code",""))[:1] in ("4","5")), 20),
+        "Not indexable":         (sum(1 for d in filtered if not d.get("is_indexable")),                    15),
+        "Missing title":         (sum(1 for d in filtered if not d.get("title")),                           12),
+        "Missing meta desc":     (sum(1 for d in filtered if not d.get("meta_description")),                10),
+        "Missing H1":            (sum(1 for d in filtered if not d.get("has_h1")),                          8),
+        "No self-canonical":     (sum(1 for d in filtered if not d.get("has_self_canonical")),              8),
+        "No OG tags":            (sum(1 for d in filtered if not d.get("og_present")),                      7),
+        "No schema":             (sum(1 for d in filtered if d.get("schema_json_ld") != "YES"),             6),
+        "Images w/o alt":        (sum(1 for d in filtered if (d.get("images_without_alt") or 0) > 0),       5),
+        "Slow pages (>2s)":      (sum(1 for d in filtered if (d.get("response_time_ms") or 0) > 2000),      5),
+        "Title too long/short":  (sum(1 for d in filtered if not (30 <= (d.get("title_length") or 0) <= 60)), 4),
+    }
+
+    penalty = 0
+    for _, (count, weight) in issues_weight.items():
+        penalty += (count / N) * weight
+
+    health_score = max(0, round(100 - penalty))
+    score_color = "#3fb950" if health_score >= 80 else "#d29922" if health_score >= 50 else "#f85149"
+
+    hs_col, breakdown_col = st.columns([1, 2])
+
+    with hs_col:
+        gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=health_score,
+            domain={"x": [0, 1], "y": [0, 1]},
+            number={"font": {"color": score_color, "size": 48}},
+            gauge={
+                "axis": {"range": [0, 100], "tickcolor": FONT_COLOR},
+                "bar":  {"color": score_color},
+                "bgcolor": CHART_BG,
+                "steps": [
+                    {"range": [0, 50],  "color": "#3a1a1a"},
+                    {"range": [50, 80], "color": "#3a2e0a"},
+                    {"range": [80, 100],"color": "#1a3a22"},
+                ],
+                "threshold": {"line": {"color": score_color, "width": 3}, "thickness": 0.75, "value": health_score},
+            },
+        ))
+        _layout(gauge, "Health Score", height=280)
+        st.plotly_chart(gauge, use_container_width=True)
+
+    with breakdown_col:
+        issue_names  = list(issues_weight.keys())
+        issue_counts = [issues_weight[k][0] for k in issue_names]
+        issue_pcts   = [round(c / N * 100, 1) for c in issue_counts]
+        colors_bar   = ["#ef233c" if issues_weight[k][1] >= 10 else "#f8961e" if issues_weight[k][1] >= 6 else "#4cc9f0"
+                        for k in issue_names]
+
+        bar_fig = go.Figure(go.Bar(
+            x=issue_counts,
+            y=issue_names,
+            orientation="h",
+            marker_color=colors_bar,
+            text=[f"{c}  ({p}%)" for c, p in zip(issue_counts, issue_pcts)],
+            textposition="outside",
+            textfont=dict(size=11, color=FONT_COLOR),
+        ))
+        _layout(bar_fig, "Issues Breakdown (count & % of URLs)", height=320)
+        bar_fig.update_layout(yaxis=dict(autorange="reversed"))
+        st.plotly_chart(bar_fig, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── Section 2 & 3: Status codes + Indexability ───────────────────────────
+    col_a, col_b = st.columns(2)
+
+    with col_a:
+        from collections import Counter
+        sc_raw    = [str(d.get("status_code", "unknown")) for d in filtered]
+        sc_counts = Counter(sc_raw)
+
+        def _sc_group(code):
+            if code.startswith("2"): return "2xx OK"
+            if code.startswith("3"): return "3xx Redirect"
+            if code.startswith("4"): return "4xx Client Error"
+            if code.startswith("5"): return "5xx Server Error"
+            return "Unknown"
+
+        grouped_sc = Counter(_sc_group(c) for c in sc_raw)
+        sc_colors  = {"2xx OK": "#06d6a0", "3xx Redirect": "#f9c74f",
+                      "4xx Client Error": "#f8961e", "5xx Server Error": "#ef233c", "Unknown": "#4361ee"}
+
+        pie_sc = go.Figure(go.Pie(
+            labels=list(grouped_sc.keys()),
+            values=list(grouped_sc.values()),
+            marker_colors=[sc_colors.get(k, "#8b949e") for k in grouped_sc.keys()],
+            hole=0.5,
+            textinfo="label+percent",
+            textfont=dict(size=11),
+        ))
+        _layout(pie_sc, "HTTP Status Code Distribution", height=300)
+        st.plotly_chart(pie_sc, use_container_width=True)
+
+    with col_b:
+        idx_yes = sum(1 for d in filtered if d.get("is_indexable"))
+        idx_no  = N - idx_yes
+
+        pie_idx = go.Figure(go.Pie(
+            labels=["Indexable", "Non-indexable"],
+            values=[idx_yes, idx_no],
+            marker_colors=["#06d6a0", "#ef233c"],
+            hole=0.5,
+            textinfo="label+value+percent",
+            textfont=dict(size=11),
+        ))
+        _layout(pie_idx, "Indexability", height=300)
+        st.plotly_chart(pie_idx, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── Section 4: Performance ────────────────────────────────────────────────
+    st.markdown('<div class="section-title">Performance Distribution</div>', unsafe_allow_html=True)
+
+    col_c, col_d = st.columns(2)
+
+    with col_c:
+        rt_vals = [d.get("response_time_ms") or 0 for d in filtered]
+
+        def _rt_bucket(ms):
+            if ms < 500:   return "< 500ms"
+            if ms < 1000:  return "500ms – 1s"
+            if ms < 2000:  return "1s – 2s"
+            return "> 2s"
+
+        rt_buckets = Counter(_rt_bucket(v) for v in rt_vals)
+        bucket_order = ["< 500ms", "500ms – 1s", "1s – 2s", "> 2s"]
+        rt_colors    = ["#06d6a0", "#4cc9f0", "#f8961e", "#ef233c"]
+
+        bar_rt = go.Figure(go.Bar(
+            x=bucket_order,
+            y=[rt_buckets.get(b, 0) for b in bucket_order],
+            marker_color=rt_colors,
+            text=[rt_buckets.get(b, 0) for b in bucket_order],
+            textposition="outside",
+        ))
+        _layout(bar_rt, "Response Time Buckets", height=280)
+        st.plotly_chart(bar_rt, use_container_width=True)
+
+    with col_d:
+        sz_vals = [d.get("page_size_kb") or 0 for d in filtered]
+
+        def _sz_bucket(kb):
+            if kb < 100:  return "< 100 KB"
+            if kb < 500:  return "100 – 500 KB"
+            return "> 500 KB"
+
+        sz_buckets = Counter(_sz_bucket(v) for v in sz_vals)
+        sz_order   = ["< 100 KB", "100 – 500 KB", "> 500 KB"]
+        sz_colors  = ["#06d6a0", "#f8961e", "#ef233c"]
+
+        bar_sz = go.Figure(go.Bar(
+            x=sz_order,
+            y=[sz_buckets.get(b, 0) for b in sz_order],
+            marker_color=sz_colors,
+            text=[sz_buckets.get(b, 0) for b in sz_order],
+            textposition="outside",
+        ))
+        _layout(bar_sz, "Page Size Buckets", height=280)
+        st.plotly_chart(bar_sz, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── Section 5: Content Quality ────────────────────────────────────────────
+    st.markdown('<div class="section-title">Content Quality</div>', unsafe_allow_html=True)
+
+    col_e, col_f = st.columns(2)
+
+    with col_e:
+        def _title_bucket(l):
+            if not l or l == 0: return "Missing"
+            if l < 30:          return "Too Short (<30)"
+            if l <= 60:         return "Optimal (30–60)"
+            return "Too Long (>60)"
+
+        tl_buckets = Counter(_title_bucket(d.get("title_length") or 0) for d in filtered)
+        tl_order   = ["Missing", "Too Short (<30)", "Optimal (30–60)", "Too Long (>60)"]
+        tl_colors  = ["#ef233c", "#f8961e", "#06d6a0", "#f9c74f"]
+
+        bar_tl = go.Figure(go.Bar(
+            x=tl_order,
+            y=[tl_buckets.get(b, 0) for b in tl_order],
+            marker_color=tl_colors,
+            text=[tl_buckets.get(b, 0) for b in tl_order],
+            textposition="outside",
+        ))
+        _layout(bar_tl, "Title Length Distribution", height=280)
+        st.plotly_chart(bar_tl, use_container_width=True)
+
+    with col_f:
+        def _desc_bucket(l):
+            if not l or l == 0: return "Missing"
+            if l < 120:         return "Too Short (<120)"
+            if l <= 160:        return "Optimal (120–160)"
+            return "Too Long (>160)"
+
+        dl_buckets = Counter(_desc_bucket(d.get("meta_description_length") or 0) for d in filtered)
+        dl_order   = ["Missing", "Too Short (<120)", "Optimal (120–160)", "Too Long (>160)"]
+        dl_colors  = ["#ef233c", "#f8961e", "#06d6a0", "#f9c74f"]
+
+        bar_dl = go.Figure(go.Bar(
+            x=dl_order,
+            y=[dl_buckets.get(b, 0) for b in dl_order],
+            marker_color=dl_colors,
+            text=[dl_buckets.get(b, 0) for b in dl_order],
+            textposition="outside",
+        ))
+        _layout(bar_dl, "Meta Description Length Distribution", height=280)
+        st.plotly_chart(bar_dl, use_container_width=True)
+
+    # word count distribution
+    wc_vals = [d.get("word_count") or 0 for d in filtered]
+
+    def _wc_bucket(w):
+        if w == 0:    return "0 words"
+        if w < 100:   return "1–99"
+        if w < 300:   return "100–299"
+        if w < 600:   return "300–599"
+        if w < 1000:  return "600–999"
+        return "1000+"
+
+    wc_buckets = Counter(_wc_bucket(v) for v in wc_vals)
+    wc_order   = ["0 words", "1–99", "100–299", "300–599", "600–999", "1000+"]
+    wc_colors  = ["#ef233c", "#f8961e", "#f9c74f", "#06d6a0", "#06d6a0", "#06d6a0"]
+
+    bar_wc = go.Figure(go.Bar(
+        x=wc_order,
+        y=[wc_buckets.get(b, 0) for b in wc_order],
+        marker_color=wc_colors,
+        text=[wc_buckets.get(b, 0) for b in wc_order],
+        textposition="outside",
+    ))
+    _layout(bar_wc, "Word Count Distribution", height=260)
+    st.plotly_chart(bar_wc, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── Section 6: Link Profile ───────────────────────────────────────────────
+    st.markdown('<div class="section-title">Link Profile</div>', unsafe_allow_html=True)
+
+    total_int  = sum(d.get("internal_links", 0) or 0 for d in filtered)
+    total_ext  = sum(d.get("external_links", 0) or 0 for d in filtered)
+    total_nf   = sum(d.get("nofollow_links", 0) or 0 for d in filtered)
+    avg_int    = round(total_int / N, 1)
+    avg_ext    = round(total_ext / N, 1)
+
+    lm1, lm2, lm3, lm4, lm5 = st.columns(5)
+    mcard(lm1, "Total Int. Links",  total_int)
+    mcard(lm2, "Total Ext. Links",  total_ext,  "")
+    mcard(lm3, "Total Nofollow",    total_nf)
+    mcard(lm4, "Avg Int / Page",    avg_int)
+    mcard(lm5, "Avg Ext / Page",    avg_ext,    "")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Top 10 most linked-to internal pages
+    from collections import defaultdict
+    link_target_counts: dict = defaultdict(int)
+    for d in filtered:
+        for lnk in (d.get("internal_links_list") or []):
+            link_target_counts[lnk] += 1
+
+    if link_target_counts:
+        top10 = sorted(link_target_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        top10_urls, top10_counts = zip(*top10)
+
+        bar_links = go.Figure(go.Bar(
+            x=top10_counts,
+            y=[u[-60:] + "…" if len(u) > 60 else u for u in top10_urls],
+            orientation="h",
+            marker_color="#4361ee",
+            text=top10_counts,
+            textposition="outside",
+        ))
+        _layout(bar_links, "Top 10 Most Linked-to Internal Pages", height=320)
+        bar_links.update_layout(yaxis=dict(autorange="reversed"))
+        st.plotly_chart(bar_links, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── Section 7: Image Audit ────────────────────────────────────────────────
+    st.markdown('<div class="section-title">Image Audit</div>', unsafe_allow_html=True)
+
+    total_imgs   = sum(d.get("total_images", 0) or 0 for d in filtered)
+    no_alt_imgs  = sum(d.get("images_without_alt", 0) or 0 for d in filtered)
+    lazy_imgs    = sum(d.get("images_with_lazy_load", 0) or 0 for d in filtered)
+    webp_imgs    = sum(d.get("webp_images", 0) or 0 for d in filtered)
+    with_alt     = total_imgs - no_alt_imgs
+
+    im1, im2, im3, im4, im5 = st.columns(5)
+    mcard(im1, "Total Images",   total_imgs,  "")
+    mcard(im2, "With Alt Text",  with_alt)
+    mcard(im3, "Missing Alt",    no_alt_imgs, "red" if no_alt_imgs else "green")
+    mcard(im4, "Lazy Loaded",    lazy_imgs)
+    mcard(im5, "WebP Format",    webp_imgs)
+
+    if total_imgs > 0:
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_img1, col_img2 = st.columns(2)
+
+        with col_img1:
+            pie_alt = go.Figure(go.Pie(
+                labels=["With Alt", "Missing Alt"],
+                values=[with_alt, no_alt_imgs],
+                marker_colors=["#06d6a0", "#ef233c"],
+                hole=0.5,
+                textinfo="label+value+percent",
+            ))
+            _layout(pie_alt, "Alt Text Coverage", height=260)
+            st.plotly_chart(pie_alt, use_container_width=True)
+
+        with col_img2:
+            other_imgs = total_imgs - webp_imgs
+            pie_webp = go.Figure(go.Pie(
+                labels=["WebP", "Other Formats"],
+                values=[webp_imgs, other_imgs],
+                marker_colors=["#4361ee", "#30363d"],
+                hole=0.5,
+                textinfo="label+value+percent",
+            ))
+            _layout(pie_webp, "WebP Adoption", height=260)
+            st.plotly_chart(pie_webp, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── Section 8: Schema & Social Coverage ──────────────────────────────────
+    st.markdown('<div class="section-title">Schema & Social Coverage</div>', unsafe_allow_html=True)
+
+    has_schema  = sum(1 for d in filtered if d.get("schema_json_ld") == "YES")
+    has_og      = sum(1 for d in filtered if d.get("og_present"))
+    has_twitter = sum(1 for d in filtered if d.get("twitter_card"))
+    has_faq_s   = sum(1 for d in filtered if d.get("has_faq_schema"))
+    has_bread   = sum(1 for d in filtered if d.get("has_breadcrumb_schema"))
+
+    cov_labels = ["Schema JSON-LD", "Open Graph", "Twitter Card", "FAQ Schema", "Breadcrumb Schema"]
+    cov_vals   = [has_schema, has_og, has_twitter, has_faq_s, has_bread]
+    cov_pcts   = [round(v / N * 100, 1) for v in cov_vals]
+    cov_colors = ["#06d6a0" if p >= 80 else "#f9c74f" if p >= 40 else "#ef233c" for p in cov_pcts]
+
+    bar_cov = go.Figure(go.Bar(
+        x=cov_vals,
+        y=cov_labels,
+        orientation="h",
+        marker_color=cov_colors,
+        text=[f"{v}  ({p}%)" for v, p in zip(cov_vals, cov_pcts)],
+        textposition="outside",
+    ))
+    _layout(bar_cov, f"Coverage out of {N} pages", height=280)
+    bar_cov.update_layout(yaxis=dict(autorange="reversed"))
+    st.plotly_chart(bar_cov, use_container_width=True)
+
+    # Schema type breakdown
+    all_types: list = []
+    for d in filtered:
+        for t in (d.get("schema_types") or []):
+            all_types.append(t)
+
+    if all_types:
+        type_counts = Counter(all_types).most_common(10)
+        t_labels, t_vals = zip(*type_counts)
+        bar_types = go.Figure(go.Bar(
+            x=t_vals,
+            y=t_labels,
+            orientation="h",
+            marker_color="#7209b7",
+            text=t_vals,
+            textposition="outside",
+        ))
+        _layout(bar_types, "Top Schema Types Found", height=max(240, len(t_labels) * 28))
+        bar_types.update_layout(yaxis=dict(autorange="reversed"))
+        st.plotly_chart(bar_types, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── Section 9: URL Structure ──────────────────────────────────────────────
+    st.markdown('<div class="section-title">URL Structure</div>', unsafe_allow_html=True)
+
+    col_u1, col_u2 = st.columns(2)
+
+    with col_u1:
+        depths = [d.get("url_depth") or 0 for d in filtered]
+
+        def _depth_label(dep):
+            if dep <= 1: return "Depth 1"
+            if dep == 2: return "Depth 2"
+            if dep == 3: return "Depth 3"
+            return "Depth 4+"
+
+        depth_counts = Counter(_depth_label(dep) for dep in depths)
+        d_order = ["Depth 1", "Depth 2", "Depth 3", "Depth 4+"]
+
+        bar_depth = go.Figure(go.Bar(
+            x=d_order,
+            y=[depth_counts.get(b, 0) for b in d_order],
+            marker_color=["#06d6a0", "#4cc9f0", "#f8961e", "#ef233c"],
+            text=[depth_counts.get(b, 0) for b in d_order],
+            textposition="outside",
+        ))
+        _layout(bar_depth, "URL Depth Distribution", height=280)
+        st.plotly_chart(bar_depth, use_container_width=True)
+
+    with col_u2:
+        https_yes = sum(1 for d in filtered if d.get("url_has_https"))
+        https_no  = N - https_yes
+
+        pie_https = go.Figure(go.Pie(
+            labels=["HTTPS", "HTTP (insecure)"],
+            values=[https_yes, https_no],
+            marker_colors=["#06d6a0", "#ef233c"],
+            hole=0.5,
+            textinfo="label+value+percent",
+        ))
+        _layout(pie_https, "HTTPS Adoption", height=280)
+        st.plotly_chart(pie_https, use_container_width=True)
+
+    ul_vals = [d.get("url_length") or 0 for d in filtered]
+    avg_ul  = round(sum(ul_vals) / N, 1) if N else 0
+
+    uc1, uc2 = st.columns(2)
+    mcard(uc1, "Avg URL Length (chars)", avg_ul, "green" if avg_ul < 100 else "yellow")
+    mcard(uc2, "HTTPS Pages", https_yes)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 5 — URL Inspector
+# ══════════════════════════════════════════════════════════════════════════════
+with tab5:
+    if not filtered:
+        st.info("No data yet. Run the spider first.")
+        st.stop()
+
+    # ── helpers ───────────────────────────────────────────────────────────────
+    def _url_block(urls: list[str]) -> str:
+        """Render a scrollable list of URLs."""
+        items = "".join(
+            f'<div style="padding:5px 0;border-bottom:1px solid #21262d;'
+            f'font-size:12px;color:#58a6ff;word-break:break-all">{u}</div>'
+            for u in urls
+        )
+        return f'<div style="max-height:260px;overflow-y:auto;padding:4px 0">{items}</div>'
+
+    def _csv(urls: list[str]) -> bytes:
+        return ("url\n" + "\n".join(urls)).encode("utf-8")
+
+    def _section_header(title: str, total: int, icon: str = "", suffix: str = "URLs affected"):
+        colour = "#f85149" if total > 0 else "#3fb950"
+        st.markdown(
+            f'<div style="display:flex;align-items:center;gap:10px;'
+            f'padding:10px 0 6px 0;border-bottom:2px solid #30363d;margin-bottom:12px">'
+            f'<span style="font-size:16px">{icon}</span>'
+            f'<span style="font-size:15px;font-weight:700;color:#e6edf3">{title}</span>'
+            f'<span style="margin-left:auto;background:#21262d;color:{colour};'
+            f'font-size:12px;font-weight:600;padding:2px 10px;border-radius:12px;'
+            f'border:1px solid {colour}">{total} {suffix}</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+
+    def _group_expander(label: str, urls: list[str], dl_key: str):
+        if not urls:
+            return
+        with st.expander(
+            f"{label}  —  {len(urls)} URL{'s' if len(urls) != 1 else ''}",
+            expanded=False,
+        ):
+            st.markdown(_url_block(urls), unsafe_allow_html=True)
+            st.download_button(
+                label=f"Download {len(urls)} URL{'s' if len(urls) != 1 else ''} as CSV",
+                data=_csv(urls),
+                file_name=f"{dl_key}.csv",
+                mime="text/csv",
+                key=f"dl_{dl_key}_{len(urls)}",
+            )
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 1 — Status Codes
+    # ─────────────────────────────────────────────────────────────────────────
+    from collections import defaultdict as _dd
+
+    _sc_errors = sum(1 for d in filtered if not str(d.get("status_code", "")).startswith("2"))
+    _section_header("Status Codes", _sc_errors, "", suffix="errors")
+
+    sc_groups: dict = _dd(list)
+    for d in filtered:
+        sc_groups[str(d.get("status_code", "unknown"))].append(d.get("url", ""))
+
+    for code in sorted(sc_groups.keys()):
+        urls_sc = sc_groups[code]
+        c = code
+        if c.startswith("2"):   icon = "🟢"
+        elif c.startswith("3"): icon = "🟡"
+        elif c.startswith("4"): icon = "🔴"
+        elif c.startswith("5"): icon = "🔴"
+        else:                   icon = "⚪"
+        _group_expander(f"{icon}  HTTP {code}", urls_sc, f"status_{code}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 2 — Cache Status
+    # ─────────────────────────────────────────────────────────────────────────
+    cache_affected = [d for d in filtered if d.get("x_vercel_cache") or d.get("cf_cache_status")]
+    _section_header("Cache Status", len(cache_affected), "")
+
+    # Vercel cache
+    vc_groups: dict = _dd(list)
+    for d in filtered:
+        v = str(d.get("x_vercel_cache") or "").upper() or "NOT SET"
+        vc_groups[v].append(d.get("url", ""))
+
+    st.markdown('<div class="section-title" style="margin-top:8px">X-Vercel-Cache</div>', unsafe_allow_html=True)
+    for status in sorted(vc_groups.keys()):
+        bc = "green" if status == "HIT" else "red" if status == "MISS" else "yellow" if status in ("BYPASS","STALE") else "gray"
+        _group_expander(f"Vercel — {status}", vc_groups[status], f"vercel_{status.lower()}")
+
+    # Cloudflare cache
+    cf_groups: dict = _dd(list)
+    for d in filtered:
+        v = str(d.get("cf_cache_status") or "").upper() or "NOT SET"
+        cf_groups[v].append(d.get("url", ""))
+
+    st.markdown('<div class="section-title" style="margin-top:8px">CF-Cache-Status</div>', unsafe_allow_html=True)
+    for status in sorted(cf_groups.keys()):
+        bc = "green" if status == "HIT" else "red" if status == "MISS" else "yellow" if status in ("BYPASS","STALE") else "gray"
+        _group_expander(f"Cloudflare — {status}", cf_groups[status], f"cf_{status.lower()}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 3 — Indexability Issues
+    # ─────────────────────────────────────────────────────────────────────────
+    _idx_issues = {
+        "Not Indexable":          [d.get("url","") for d in filtered if not d.get("is_indexable")],
+        "No Self-Canonical":      [d.get("url","") for d in filtered if not d.get("has_self_canonical")],
+        "Canonical Mismatch":     [d.get("url","") for d in filtered
+                                   if d.get("canonical_url") and d.get("canonical_url") != d.get("url","")],
+        "Has Nosnippet":          [d.get("url","") for d in filtered if d.get("has_nosnippet")],
+        "Has Noarchive":          [d.get("url","") for d in filtered if d.get("has_noarchive")],
+    }
+    _idx_total = sum(len(v) for v in _idx_issues.values())
+    _section_header("Indexability Issues", _idx_total, "")
+
+    for label, urls in _idx_issues.items():
+        _group_expander(label, urls, f"idx_{label.lower().replace(' ','_').replace('-','_')}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 4 — On-Page Issues
+    # ─────────────────────────────────────────────────────────────────────────
+    _op_issues = {
+        "Missing Title":               [d.get("url","") for d in filtered if not d.get("title")],
+        "Title Too Short (<30 chars)": [d.get("url","") for d in filtered
+                                        if d.get("title") and (d.get("title_length") or 0) < 30],
+        "Title Too Long (>60 chars)":  [d.get("url","") for d in filtered
+                                        if (d.get("title_length") or 0) > 60],
+        "Missing Meta Description":    [d.get("url","") for d in filtered if not d.get("meta_description")],
+        "Meta Desc Too Short (<120)":  [d.get("url","") for d in filtered
+                                        if d.get("meta_description") and (d.get("meta_description_length") or 0) < 120],
+        "Meta Desc Too Long (>160)":   [d.get("url","") for d in filtered
+                                        if (d.get("meta_description_length") or 0) > 160],
+        "Missing H1":                  [d.get("url","") for d in filtered if not d.get("has_h1")],
+        "Multiple H1s":                [d.get("url","") for d in filtered if (d.get("h1_count") or 0) > 1],
+    }
+    _op_total = sum(len(v) for v in _op_issues.values())
+    _section_header("On-Page Issues", _op_total, "")
+
+    for label, urls in _op_issues.items():
+        bc = "red" if "Missing" in label else "yellow"
+        _group_expander(label, urls, f"op_{label.lower().replace(' ','_').replace('<','lt').replace('>','gt').replace('(','').replace(')','').replace('/','')}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 5 — Performance Issues
+    # ─────────────────────────────────────────────────────────────────────────
+    _perf_issues = {
+        "Slow Response (>2s)":      [d.get("url","") for d in filtered if (d.get("response_time_ms") or 0) > 2000],
+        "Very Slow (>4s)":          [d.get("url","") for d in filtered if (d.get("response_time_ms") or 0) > 4000],
+        "Large Page (>500 KB)":     [d.get("url","") for d in filtered if (d.get("page_size_kb") or 0) > 500],
+        "Very Large Page (>1 MB)":  [d.get("url","") for d in filtered if (d.get("page_size_kb") or 0) > 1024],
+    }
+    _perf_total = sum(len(v) for v in _perf_issues.values())
+    _section_header("Performance Issues", _perf_total, "")
+
+    for label, urls in _perf_issues.items():
+        bc = "red" if "Very" in label else "yellow"
+        _group_expander(label, urls, f"perf_{label.lower().replace(' ','_').replace('>','gt').replace('(','').replace(')','').replace('/','')}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 6 — Content Issues
+    # ─────────────────────────────────────────────────────────────────────────
+    _content_issues = {
+        "Thin Content (<100 words)":    [d.get("url","") for d in filtered if (d.get("word_count") or 0) < 100],
+        "Low Content (100–299 words)":  [d.get("url","") for d in filtered
+                                         if 100 <= (d.get("word_count") or 0) < 300],
+        "No Paragraphs":                [d.get("url","") for d in filtered if not (d.get("number_of_paragraphs") or 0)],
+        "No H2 Headings":               [d.get("url","") for d in filtered if not (d.get("h2_count") or 0)],
+    }
+    _section_header("Content Issues", sum(len(v) for v in _content_issues.values()), "")
+
+    for label, urls in _content_issues.items():
+        bc = "red" if "Thin" in label or "No" in label else "yellow"
+        _group_expander(label, urls, f"content_{label.lower().replace(' ','_').replace('<','lt').replace('>','gt').replace('(','').replace(')','').replace('–','-').replace('/','')}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 7 — Image Issues
+    # ─────────────────────────────────────────────────────────────────────────
+    _img_issues = {
+        "Images Missing Alt Text":  [d.get("url","") for d in filtered if (d.get("images_without_alt") or 0) > 0],
+        "No WebP Images":           [d.get("url","") for d in filtered
+                                     if (d.get("total_images") or 0) > 0 and not (d.get("webp_images") or 0)],
+        "No Lazy-Loaded Images":    [d.get("url","") for d in filtered
+                                     if (d.get("total_images") or 0) > 0 and not (d.get("images_with_lazy_load") or 0)],
+    }
+    _img_total = sum(len(v) for v in _img_issues.values())
+    _section_header("Image Issues", _img_total, "")
+
+    for label, urls in _img_issues.items():
+        _group_expander(label, urls, f"img_{label.lower().replace(' ','_').replace('-','_')}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 8 — Schema Issues
+    # ─────────────────────────────────────────────────────────────────────────
+    _schema_issues = {
+        "No Schema at All":       [d.get("url","") for d in filtered if d.get("schema_json_ld") != "YES"],
+        "No FAQ Schema":          [d.get("url","") for d in filtered if not d.get("has_faq_schema")],
+        "No Breadcrumb Schema":   [d.get("url","") for d in filtered if not d.get("has_breadcrumb_schema")],
+    }
+    _schema_total = sum(len(v) for v in _schema_issues.values())
+    _section_header("Schema Issues", _schema_total, "")
+
+    for label, urls in _schema_issues.items():
+        bc = "red" if "No Schema" in label else "yellow"
+        _group_expander(label, urls, f"schema_{label.lower().replace(' ','_')}")
+
+    # URLs grouped by schema type
+    schema_type_groups: dict = _dd(list)
+    for d in filtered:
+        for t in (d.get("schema_types") or []):
+            schema_type_groups[t].append(d.get("url",""))
+
+    if schema_type_groups:
+        st.markdown('<div class="section-title" style="margin-top:8px">Pages by Schema Type</div>', unsafe_allow_html=True)
+        for stype in sorted(schema_type_groups.keys()):
+            _group_expander(stype, schema_type_groups[stype], f"schematype_{stype.lower().replace(' ','_')}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 9 — Social / OG Issues
+    # ─────────────────────────────────────────────────────────────────────────
+    _social_issues = {
+        "No Open Graph Tags":          [d.get("url","") for d in filtered if not d.get("og_present")],
+        "No Twitter Card":             [d.get("url","") for d in filtered if not d.get("twitter_card")],
+        "OG Present but No OG Image":  [d.get("url","") for d in filtered
+                                        if d.get("og_present") and not d.get("og_image")],
+        "OG Present but No OG Desc":   [d.get("url","") for d in filtered
+                                        if d.get("og_present") and not d.get("og_description")],
+    }
+    _social_total = sum(len(v) for v in _social_issues.values())
+    _section_header("Social / OG Issues", _social_total, "")
+
+    for label, urls in _social_issues.items():
+        bc = "red" if "No Open Graph" in label else "yellow"
+        _group_expander(label, urls, f"social_{label.lower().replace(' ','_').replace('/','').replace('(','').replace(')','')}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SECTION 10 — URL Structure Issues
+    # ─────────────────────────────────────────────────────────────────────────
+    _url_issues = {
+        "HTTP (Non-HTTPS)":       [d.get("url","") for d in filtered if not d.get("url_has_https")],
+        "URL Depth 4+":           [d.get("url","") for d in filtered if (d.get("url_depth") or 0) >= 4],
+        "URL Too Long (>100)":    [d.get("url","") for d in filtered if (d.get("url_length") or 0) > 100],
+        "Has Redirect Chain":     [d.get("url","") for d in filtered if d.get("redirect_chain")],
+    }
+    _url_total = sum(len(v) for v in _url_issues.values())
+    _section_header("URL Structure Issues", _url_total, "")
+
+    for label, urls in _url_issues.items():
+        bc = "red" if "HTTP" in label or "Redirect" in label else "yellow"
+        _group_expander(label, urls, f"url_{label.lower().replace(' ','_').replace('(','').replace(')','').replace('+','plus').replace('>','gt').replace('/','')}")
