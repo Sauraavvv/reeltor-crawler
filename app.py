@@ -295,7 +295,8 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[b
         prog_bar    = st.progress(0)
 
         import psutil
-        proc = psutil.Process(process.pid)
+        proc       = psutil.Process(process.pid)
+        start_time = time.time()
 
         while not finished[0]:
             try:
@@ -321,9 +322,12 @@ def run_spider(urls_file: str, output_file: str, total_urls: int = 0) -> tuple[b
             prog_bar.progress(pct)
             time.sleep(0.5)
 
+        elapsed     = round(time.time() - start_time, 1)
+        mins, secs  = divmod(int(elapsed), 60)
+        time_str    = f"{mins}m {secs}s" if mins else f"{secs}s"
         status_text.markdown(
             f'<div style="font-size:13px;color:#3fb950;margin-bottom:4px">'
-            f'Done — <b>{total_urls}</b> URLs crawled.</div>',
+            f'Done — <b>{total_urls}</b> URLs crawled in <b>{time_str}</b>.</div>',
             unsafe_allow_html=True,
         )
         prog_bar.progress(1.0)
