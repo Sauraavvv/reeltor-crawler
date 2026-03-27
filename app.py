@@ -167,7 +167,6 @@ for key, default in [
     ("output_json_bytes", None),
     ("last_run_log", ""),
     ("analysis_done", False),
-    ("target_urls", []),
 ]:
     if key not in st.session_state:
         st.session_state[key] = default
@@ -468,28 +467,8 @@ with st.sidebar:
                 url_count = 1
                 st.success("1 URL ready")
 
-    from urllib.parse import urlparse as _urlparse
-    seed_urls: list[str] = []
-    if urls_preview:
-        _seen_seeds: set = set()
-        for _u in urls_preview:
-            _p = _urlparse(_u)
-            _base = f"{_p.scheme}://{_p.netloc}"
-            _parts = [x for x in _p.path.strip("/").split("/") if x]
-            _candidates = [
-                f"{_base}/",
-            ]
-            if _parts:
-                _candidates.append(f"{_base}/{_parts[0]}")
-            if len(_parts) >= 2:
-                _candidates.append(f"{_base}/{_parts[0]}/{_parts[1]}")
-            for _s in _candidates:
-                if _s not in _seen_seeds:
-                    _seen_seeds.add(_s)
-                    seed_urls.append(_s)
-
     st.markdown("---")
-    st.markdown("**Step 3 — Run Analysis**")
+    st.markdown("**Step 2 — Run Analysis**")
 
     analyze_btn = st.button(
         f"Analyze {url_count} URL{'s' if url_count != 1 else ''}",
@@ -549,29 +528,23 @@ with st.sidebar:
         sel_error  = "— show all —"
 
 if analyze_btn and url_count > 0:
-    all_urls_to_crawl = list(dict.fromkeys(urls_preview + seed_urls))
-
-    st.session_state["target_urls"] = urls_preview
-
     tmp_urls = tempfile.NamedTemporaryFile(
         mode="w", suffix=".txt", delete=False, encoding="utf-8"
     )
-    tmp_urls.write("\n".join(all_urls_to_crawl))
+    tmp_urls.write("\n".join(urls_preview))
     tmp_urls.close()
 
     tmp_out = tempfile.NamedTemporaryFile(suffix=".json", delete=False)
     tmp_out.close()
     output_path = tmp_out.name
 
-    seed_note = f" + {len(seed_urls)} seed URL{'s' if len(seed_urls) != 1 else ''}" if seed_urls else ""
     st.markdown(
-        f'<div class="run-info">Analysing <b>{url_count}</b> URL(s){seed_note} — '
+        f'<div class="run-info">Analysing <b>{url_count}</b> URL(s) — '
         f'this may take a while depending on page count and network speed.</div>',
         unsafe_allow_html=True,
     )
 
-    with st.spinner("I'm working, sit back and have some popcorns :)"):
-        success, log_text = run_spider(tmp_urls.name, output_path, total_urls=len(all_urls_to_crawl))
+    success, log_text = run_spider(tmp_urls.name, output_path, total_urls=url_count)
 
     st.session_state.last_run_log = log_text
 
@@ -1702,47 +1675,3 @@ with tab5:
         _group_expander(label, urls, f"url_{label.lower().replace(' ','_').replace('(','').replace(')','').replace('+','plus').replace('>','gt').replace('/','')}")
 
     st.markdown("<br>", unsafe_allow_html=True)
-
-    _target_urls = set(st.session_state.get("target_urls") or [d.get("url","") for d in filtered])
-    _seed_set    = {d.get("url","") for d in filtered} - _target_urls
-
-    _all_linked = set()
-    for d in filtered:
-        for lnk in (d.get("internal_links_list") or []):
-            _all_linked.add(lnk)
-
-    _orphan_urls = sorted(_target_urls - _all_linked)
-
-    _section_header("Orphan URLs", len(_orphan_urls), "", suffix="orphan pages")
-
-    _used_seeds = bool(_seed_set)
-    if _used_seeds:
-        st.markdown(
-            f'<div style="font-size:12px;color:#58a6ff;background:#0d2137;border:1px solid #1f6feb;'
-            f'border-radius:6px;padding:8px 12px;margin-bottom:10px">'
-            f'Seed pages crawled: <b>{len(_seed_set)}</b> — '
-            f'orphan check is accurate (only your sitemap URLs are evaluated).'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            '<div style="font-size:12px;color:#d29922;background:#3a2e0a;border:1px solid #d29922;'
-            'border-radius:6px;padding:8px 12px;margin-bottom:10px">'
-            'No seed URLs were added. Results may be inaccurate — paste homepage & category pages '
-            'in <b>Step 2 (Seed URLs)</b> in the sidebar for a reliable orphan check.'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-    if _orphan_urls:
-        st.markdown(
-            '<div style="font-size:12px;color:#8b949e;margin-bottom:10px">'
-            'These pages are not linked from any crawled page. '
-            'Search engines may struggle to discover or index them.'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-        _group_expander("All Orphan Pages", _orphan_urls, "orphan_urls")
-    else:
-        st.success("No orphan URLs found — every target page has at least one internal link pointing to it.")
