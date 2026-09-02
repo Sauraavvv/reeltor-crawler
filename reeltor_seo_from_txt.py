@@ -143,6 +143,10 @@ class ReeltorSeoSpider(scrapy.Spider):
         'PLAYWRIGHT_HEADLESS': True,
 
         'LOG_LEVEL': 'INFO',
+
+        # Let 4xx / 5xx responses reach parse_item instead of being dropped,
+        # so the real status code (and the error page's HTML) is recorded.
+        'HTTPERROR_ALLOW_ALL': True,
     }
 
     def __init__(self, urls_file='urls.txt', *args, **kwargs):
@@ -181,7 +185,11 @@ class ReeltorSeoSpider(scrapy.Spider):
         self.logger.error(f"Error on {url}: {failure.value}")
         item = ReeltorSeoItem()
         item['url'] = url
-        item['status_code'] = 'ERROR'
+        # Keep the real HTTP status when there is a response (e.g. HttpError);
+        # only genuine network failures (DNS, timeout, connection reset) stay 'ERROR'.
+        response = getattr(failure.value, 'response', None)
+        item['status_code'] = response.status if response is not None else 'ERROR'
+        item['final_url'] = response.url if response is not None else url
         yield item
 
     def parse_item(self, response):
